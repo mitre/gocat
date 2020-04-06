@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	//"github.com/mitre/gocat/util"
-	"../../util"
+	"../util"
 )
 
 const (

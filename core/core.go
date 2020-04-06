@@ -20,13 +20,13 @@ func Core(server string, group string, delay int, c2 map[string]string, p2pRecei
 	output.SetVerbose(verbose)
 	output.VerbosePrint("Started sandcat in verbose mode.")
 	output.VerbosePrint(fmt.Sprintf("initial delay=%d", delay))
+	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", c2["c2Name"]))
+	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", c2["c2Name"]))
 
-	// Build and run new agent.
+	// Initialize and run new agent.
 	sandcatAgent := &agent.Agent{}
-	sandcatAgent.Initialize(server, group, c2["c2Name"], c2["c2Name"], p2pReceiversOn)
+	sandcatAgent.Initialize(server, group, p2pReceiversOn)
 	util.Sleep(float64(delay))
-	for {
-		sandcatAgent.Run()
-		util.Sleep(300)
-	}
+	sandcatAgent.Run(c2)
+	sandcatAgent.Terminate()
 }

@@ -34,7 +34,6 @@ func (contact API) GetBeaconBytes(profile map[string]interface{}) []byte {
 // Return the file bytes for the requested payload.
 func (contact API) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
     var payloadBytes []byte
-    output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
     server := profile["server"]
     platform := profile["platform"]
     if server != nil && platform != nil {
