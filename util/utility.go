@@ -2,16 +2,10 @@ package util
 
 import (
 	"encoding/base64"
-	//"encoding/hex"
 	"encoding/json"
-	//"io"
-	//"net/http"
-	//"fmt"
 	"os"
 	"path/filepath"
-	//"strings"
 	"time"
-	//"unicode"
 )
 
 // Encode base64 encodes bytes

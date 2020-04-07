@@ -28,7 +28,12 @@ var CommunicationChannels = map[string]Contact{}
 // Given requested C2 configuration, returns the requested C2 contact, or the HTTP
 // contact upon if error occurs.
 func ChooseCommunicationChannel(profile map[string]interface{}, c2Config map[string]string) Contact {
-	coms, _ := CommunicationChannels["HTTP"] // Default.
+	// Default C2 channel is HTTP
+	coms, ok := CommunicationChannels["HTTP"]
+	if !ok {
+		output.VerbosePrint("[-] Default C2 channel HTTP not found!")
+		return nil
+	}
 	c2Name, ok := c2Config["c2Name"]
 	if ok {
 		requestedComs, ok := CommunicationChannels[c2Name]
