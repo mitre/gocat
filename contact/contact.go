@@ -5,10 +5,8 @@ import (
 	"path/filepath"
 	"reflect"
 
-	//"github.com/mitre/gocat/util"
-	//"github.com/mitre/gocat/output"
-	"../util"
-	"../output"
+	"github.com/mitre/gocat/output"
+	"github.com/mitre/gocat/util"
 )
 
 const (

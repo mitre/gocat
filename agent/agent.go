@@ -3,24 +3,19 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"time"
 
-	//"github.com/mitre/gocat/privdetect"
-	//"github.com/mitre/gocat/execute"
-	//"github.com/mitre/gocat/util"
-	//"github.com/mitre/gocat/contact"
-	//"github.com/mitre/sandcat/gocat/output"
-	"../privdetect"
-	"../execute"
-	"../util"
-	"../contact"
-	"../output"
+	"github.com/mitre/gocat/contact"
+	"github.com/mitre/gocat/execute"
+	"github.com/mitre/gocat/output"
+	"github.com/mitre/gocat/privdetect"
+	"github.com/mitre/gocat/util"
 )
 
 type AgentInterface interface {
@@ -61,14 +56,14 @@ type Agent struct {
 // Set up agent variables.
 func (a *Agent) Initialize(server string, group string, enableP2pReceivers bool) {
 	host, _ := os.Hostname()
-	user, err := user.Current()
+	username, err := user.Current()
 	if err != nil {
 		usernameBytes, err := exec.Command("whoami").CombinedOutput()
 		if err != nil {
 			a.username = string(usernameBytes)
 		}
 	} else {
-		a.username = user.Username
+		a.username = username.Username
 	}
 	a.server = server
 	a.group = group
@@ -124,56 +119,7 @@ func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 	}
 }
 
-// Establish contact with C2 and run instructions.
-func (a *Agent) Run(c2Config map[string]string) {
-	// Establish communication channels.
-	comsChosen := false
-	for !comsChosen {
-		coms := contact.ChooseCommunicationChannel(a.GetFullProfile(), c2Config)
-		if coms != nil {
-			a.beaconContact = coms
-			a.heartbeatContact = coms
-		} else {
-			util.Sleep(300)
-		}
-	}
 
-	// Start main execution loop.
-	watchdog := 0
-	checkin := time.Now()
-	for (util.EvaluateWatchdog(checkin, watchdog)) {
-		// Send beacon and get response.
-		beacon := a.Beacon()
-
-		// Process beacon response.
-		if len(beacon) != 0 {
-			a.paw = beacon["paw"].(string)
-			checkin = time.Now()
-
-			// We have established comms. Run p2p receivers if allowed.
-			// TODO
-		}
-		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
-			// Run commands and send results.
-			cmds := reflect.ValueOf(beacon["instructions"])
-			for i := 0; i < cmds.Len(); i++ {
-				cmd := cmds.Index(i).Elem().String()
-				command := util.Unpack([]byte(cmd))
-				output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))
-				droppedPayloads := contact.DownloadPayloads(a.GetTrimmedProfile(), command["payloads"].([]interface{}), a.beaconContact)
-				go a.runInstruction(command, droppedPayloads)
-				util.Sleep(command["sleep"].(float64))
-			}
-		} else {
-			if len(beacon) > 0 {
-				util.Sleep(float64(beacon["sleep"].(int)))
-				watchdog = beacon["watchdog"].(int)
-			} else {
-				util.Sleep(float64(15))
-			}
-		}
-	}
-}
 
 // Pings C2 for instructions and returns them.
 func (a *Agent) Beacon() map[string]interface{} {
@@ -185,7 +131,10 @@ func (a *Agent) Beacon() map[string]interface{} {
 			if response != nil {
 				output.VerbosePrint("[+] beacon: ALIVE")
 				var commands interface{}
-				json.Unmarshal(response, &beacon)
+				err := json.Unmarshal(response, &beacon)
+				if err != nil {
+
+				}
 				json.Unmarshal([]byte(beacon["instructions"].(string)), &commands)
 				beacon["sleep"] = int(beacon["sleep"].(float64))
 				beacon["watchdog"] = int(beacon["watchdog"].(float64))

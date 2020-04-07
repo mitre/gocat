@@ -4,8 +4,7 @@ import (
 	"flag"
 	"strconv"
 
-	//"github.com/mitre/gocat/core"
-	"./core"
+	"github.com/mitre/gocat/core"
 )
 
 /*
@@ -14,7 +13,7 @@ with command-line arguments at runtime.
 */
 var (
 	key       = "JWHQZM9Z4HQOYICDHW4OCJAXPPNHBA"
-	server    = "http://localhost:8888"
+	server    = "http://locaqlhost:8888"
 	group     = "red"
 	c2Name    = "HTTP"
 	c2Key     = ""

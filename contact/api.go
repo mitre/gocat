@@ -7,10 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	//"github.com/mitre/gocat/output"
-	//"github.com/mitre/gocat/util"
-	"../output"
-	"../util"
+	"github.com/mitre/gocat/output"
+	"github.com/mitre/gocat/util"
 )
 
 var (
@@ -25,14 +23,14 @@ func init() {
 }
 
 //GetInstructions sends a beacon and returns response.
-func (contact API) GetBeaconBytes(profile map[string]interface{}) []byte {
+func (a API) GetBeaconBytes(profile map[string]interface{}) []byte {
 	data, _ := json.Marshal(profile)
 	address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
 	return request(address, data)
 }
 
 // Return the file bytes for the requested payload.
-func (contact API) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
+func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
     var payloadBytes []byte
     server := profile["server"]
     platform := profile["platform"]
@@ -55,13 +53,13 @@ func (contact API) GetPayloadBytes(profile map[string]interface{}, payload strin
 }
 
 //C2RequirementsMet determines if sandcat can use the selected comm channel
-func (contact API) C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) bool {
+func (a API) C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) bool {
 	output.VerbosePrint(fmt.Sprintf("Beacon API=%s", apiBeacon))
 	return true
 }
 
 //SendExecutionResults will send the execution results to the server.
-func (contact API) SendExecutionResults(profile map[string]interface{}, result map[string]interface{}) {
+func (a API) SendExecutionResults(profile map[string]interface{}, result map[string]interface{}) {
 	address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
 	profileCopy := make(map[string]interface{})
 	for k,v := range profile {

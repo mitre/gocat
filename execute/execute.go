@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	//"github.com/mitre/gocat/util"
-	"../util"
+	"github.com/mitre/gocat/util"
 )
 
 const (
