@@ -10,10 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	//"github.com/mitre/sandcat/gocat/output"
-	//"github.com/mitre/sandcat/gocat/util"
-	"../output"
-	"../util"
+	"github.com/mitre/gocat/output"
+	"github.com/mitre/gocat/util"
 )
 
 const (
