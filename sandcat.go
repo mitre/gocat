@@ -13,7 +13,7 @@ with command-line arguments at runtime.
 */
 var (
 	key       = "JWHQZM9Z4HQOYICDHW4OCJAXPPNHBA"
-	server    = "http://locaqlhost:8888"
+	server    = "http://localhost:8888"
 	group     = "red"
 	c2Name    = "HTTP"
 	c2Key     = ""
