@@ -24,14 +24,3 @@ func writePayloadBytes(location string, payload []byte) {
 	_, _ = dst.Write(payload)
 	os.Chmod(location, 0700)
 }
-
-// Determines if any payloads are not on disk
-func checkMissingPayloads(payloads []string) []string {
-	var missing []string
-	for i := range payloads {
-		if fileExists(filepath.Join(payloads[i])) == false {
-			missing = append(missing, payloads[i])
-		}
-	}
-	return missing
-}
