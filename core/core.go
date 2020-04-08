@@ -60,9 +60,9 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 			// Run commands and send results.
 			cmds := reflect.ValueOf(beacon["instructions"])
 			for i := 0; i < cmds.Len(); i++ {
-				cmd := cmds.Index(i).Elem().String()
-				var unpackedCommand map[string]interface{}
-				if err := json.Unmarshal([]byte(cmd), &unpackedCommand); err != nil {
+				marshaledCommand := cmds.Index(i).Elem().String()
+				var command map[string]interface{}
+				if err := json.Unmarshal([]byte(marshaledCommand), &command); err != nil {
 					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
 				} else {
 					output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))

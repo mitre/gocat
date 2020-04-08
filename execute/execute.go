@@ -2,7 +2,9 @@ package execute
 
 import (
 	"encoding/base64"
+	"path/filepath"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -32,11 +34,12 @@ var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
 func RunCommand(command string, payloads []string, executor string, timeout int) ([]byte, string, string){
-	cmd, _ := base64.StdEncoding.DecodeString(command)
+	decoded, _ := base64.StdEncoding.DecodeString(command)
+	cmd := string(decoded)
 	var status string
 	var result []byte
 	var pid string
-	missingPaths := util.CheckPayloadsAvailable(payloads)
+	missingPaths := checkPayloadsAvailable(payloads)
 	if len(missingPaths) == 0 {
 		result, status, pid = Executors[executor].Run(cmd, timeout)
 	} else {
@@ -45,4 +48,27 @@ func RunCommand(command string, payloads []string, executor string, timeout int)
 		pid = ERROR_STATUS
 	}
 	return result, status, pid
+}
+
+//checkPayloadsAvailable determines if any payloads are not on disk
+func checkPayloadsAvailable(payloads []string) []string {
+	var missing []string
+	for i := range payloads {
+		if fileExists(filepath.Join(payloads[i])) == false {
+			missing = append(missing, payloads[i])
+		}
+	}
+	return missing
+}
+
+// checks for a file
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
