@@ -1,10 +1,11 @@
 package execute
 
 import (
+	"encoding/base64"
+	"path/filepath"
 	"fmt"
+	"os"
 	"strings"
-
-	"github.com/mitre/gocat/util"
 )
 
 const (
@@ -33,17 +34,47 @@ var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
 func RunCommand(command string, payloads []string, executor string, timeout int) ([]byte, string, string){
-	cmd := string(util.Decode(command))
 	var status string
 	var result []byte
 	var pid string
-	missingPaths := util.CheckPayloadsAvailable(payloads)
-	if len(missingPaths) == 0 {
-		result, status, pid = Executors[executor].Run(cmd, timeout)
-	} else {
-		result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
+	decoded, err := base64.StdEncoding.DecodeString(command)
+	if err != nil {
+		result = []byte(fmt.Sprintf("Error when decoding command: %s", err.Error()))
 		status = ERROR_STATUS
 		pid = ERROR_STATUS
+	} else {
+		cmd := string(decoded)
+		missingPaths := checkPayloadsAvailable(payloads)
+		if len(missingPaths) == 0 {
+			result, status, pid = Executors[executor].Run(cmd, timeout)
+		} else {
+			result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
+			status = ERROR_STATUS
+			pid = ERROR_STATUS
+		}
 	}
 	return result, status, pid
+}
+
+//checkPayloadsAvailable determines if any payloads are not on disk
+func checkPayloadsAvailable(payloads []string) []string {
+	var missing []string
+	for i := range payloads {
+		if fileExists(filepath.Join(payloads[i])) == false {
+			missing = append(missing, payloads[i])
+		}
+	}
+	return missing
+}
+
+// checks for a file
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true
+	}
+	if os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
