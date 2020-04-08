@@ -26,9 +26,14 @@ func init() {
 
 //GetInstructions sends a beacon and returns response.
 func (a API) GetBeaconBytes(profile map[string]interface{}) []byte {
-	data, _ := json.Marshal(profile)
-	address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
-	return request(address, data)
+	data, err := json.Marshal(profile)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Cannot request beacon. Error with profile marshal: %s", err.Error()))
+		return nil
+	} else {
+		address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
+		return request(address, data)
+	}
 }
 
 // Return the file bytes for the requested payload.
@@ -69,8 +74,12 @@ func (a API) SendExecutionResults(profile map[string]interface{}, result map[str
 	}
 	results := [1]map[string]interface{}{result}
 	profileCopy["results"] = results
-	data, _ := json.Marshal(profileCopy)
-	request(address, data)
+	data, err := json.Marshal(profileCopy)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Cannot send results. Error with profile marshal: %s", err.Error()))
+	} else {
+		request(address, data)
+	}
 }
 
 func (a API) GetName() string {

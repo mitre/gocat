@@ -92,9 +92,12 @@ func gistBeacon(profile map[string]interface{}) ([]byte, bool) {
 }
 
 func createHeartbeatGist(gistType string, profile map[string]interface{}) bool {
-	data, _ := json.Marshal(profile)
-
-	if createGist(gistType, profile["paw"].(string), data) != created {
+	data, err := json.Marshal(profile)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Cannot create Gist heartbeat. Error with profile marshal: %s", err.Error()))
+		output.VerbosePrint("[-] Heartbeat GIST: FAILED")
+		return false
+	} else if createGist(gistType, profile["paw"].(string), data) != created {
 		output.VerbosePrint("[-] Heartbeat GIST: FAILED")
 		return false
 	}
@@ -103,8 +106,11 @@ func createHeartbeatGist(gistType string, profile map[string]interface{}) bool {
 }
 
 func gistResults(result map[string]interface{}) {
-	data, _ := json.Marshal(result)
-	if createGist("results", result["paw"].(string), data) != created {
+	data, err := json.Marshal(result)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Cannot create Gist results. Error with result marshal: %s", err.Error()))
+		output.VerbosePrint("[-] Results GIST: FAILED")
+	} else if createGist("results", result["paw"].(string), data) != created {
 		output.VerbosePrint("[-] Results GIST: FAILED")
 	} else {
 		output.VerbosePrint("[+] Results GIST: SUCCESS")
