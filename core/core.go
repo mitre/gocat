@@ -88,9 +88,3 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 func evaluateWatchdog(lastcheckin time.Time, watchdog int) bool {
 	return watchdog <= 0 || float64(time.Now().Sub(lastcheckin).Seconds()) <= float64(watchdog)
 }
-
-// Unpack converts bytes into JSON
-func unpack(b []byte) (out map[string]interface{}) {
-	_ = json.Unmarshal(b, &out)
-	return
-}

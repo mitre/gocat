@@ -48,9 +48,14 @@ func (g GIST) GetBeaconBytes(profile map[string]interface{}) []byte {
 //GetPayloadBytes load payload bytes from github
 func (g GIST) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
 	var payloadBytes []byte
+	var err error
 	payloads := getGists("payloads", fmt.Sprintf("%s-%s", profile["paw"].(string), payload))
 	if payloads[0] != "" {
-		payloadBytes, _ = base64.StdEncoding.DecodeString(payloads[0])
+		payloadBytes, err = base64.StdEncoding.DecodeString(payloads[0])
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Failed to decode payload bytes: %s", err.Error()))
+			return nil
+		}
 	}
 	return payloadBytes
 }
@@ -86,7 +91,11 @@ func gistBeacon(profile map[string]interface{}) ([]byte, bool) {
 	//collect instructions & delete
 	contents := getGists("instructions", profile["paw"].(string))
 	if contents != nil {
-		decodedContents, _ := base64.StdEncoding.DecodeString(contents[0])
+		decodedContents, err := base64.StdEncoding.DecodeString(contents[0])
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Failed to decode beacon response: %s", err.Error()))
+			return nil, heartbeat
+		}
 		return decodedContents, heartbeat
 	}
 	return nil, heartbeat

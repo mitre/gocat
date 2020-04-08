@@ -17,9 +17,18 @@ func fileExists(path string) bool {
 }
 
 // Creates payload from []bytes
-func writePayloadBytes(location string, payload []byte) {
-	dst, _ := os.Create(location)
-	defer dst.Close()
-	_, _ = dst.Write(payload)
-	os.Chmod(location, 0700)
+func writePayloadBytes(location string, payload []byte) error {
+	dst, err := os.Create(location)
+	if err != nil {
+		return err
+	} else {
+		defer dst.Close()
+		if _, err = dst.Write(payload); err != nil {
+			return err
+		} else if err = os.Chmod(location, 0700); err != nil {
+			return err
+		} else {
+			return nil
+		}
+	}
 }

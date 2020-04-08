@@ -34,18 +34,24 @@ var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
 func RunCommand(command string, payloads []string, executor string, timeout int) ([]byte, string, string){
-	decoded, _ := base64.StdEncoding.DecodeString(command)
-	cmd := string(decoded)
 	var status string
 	var result []byte
 	var pid string
-	missingPaths := checkPayloadsAvailable(payloads)
-	if len(missingPaths) == 0 {
-		result, status, pid = Executors[executor].Run(cmd, timeout)
-	} else {
-		result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
+	decoded, err := base64.StdEncoding.DecodeString(command)
+	if err != nil {
+		result = []byte(fmt.Sprintf("Error when decoding command: %s", err.Error()))
 		status = ERROR_STATUS
 		pid = ERROR_STATUS
+	} else {
+		cmd := string(decoded)
+		missingPaths := checkPayloadsAvailable(payloads)
+		if len(missingPaths) == 0 {
+			result, status, pid = Executors[executor].Run(cmd, timeout)
+		} else {
+			result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
+			status = ERROR_STATUS
+			pid = ERROR_STATUS
+		}
 	}
 	return result, status, pid
 }

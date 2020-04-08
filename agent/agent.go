@@ -57,13 +57,17 @@ type Agent struct {
 
 // Set up agent variables.
 func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableP2pReceivers bool) error {
-	var err error
-	host, _ := os.Hostname()
+	host, err := os.Hostname()
+	if err != nil {
+		return err
+	}
 	userInfo, err := user.Current()
 	if err != nil {
 		usernameBytes, err := exec.Command("whoami").CombinedOutput()
 		if err != nil {
 			a.username = string(usernameBytes)
+		} else {
+			return err
 		}
 	} else {
 		a.username = userInfo.Username
@@ -226,8 +230,11 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 			output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
 			payloadBytes := a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
 			if len(payloadBytes) > 0 {
-				writePayloadBytes(location, payloadBytes)
-				obtainedPayload = true
+				if err := writePayloadBytes(location, payloadBytes); err != nil {
+					output.VerbosePrint(fmt.Sprintf("[-] Error when writing payload bytes: %s", err.Error()))
+				} else {
+					obtainedPayload = true
+				}
 			}
 		} else {
 			obtainedPayload = true
