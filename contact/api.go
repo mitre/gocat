@@ -16,10 +16,12 @@ var (
 )
 
 //API communicates through HTTP
-type API struct { }
+type API struct {
+	name string
+}
 
 func init() {
-	CommunicationChannels["HTTP"] = API{}
+	CommunicationChannels["HTTP"] = API{ name: "HTTP" }
 }
 
 //GetInstructions sends a beacon and returns response.
@@ -69,6 +71,10 @@ func (a API) SendExecutionResults(profile map[string]interface{}, result map[str
 	profileCopy["results"] = results
 	data, _ := json.Marshal(profileCopy)
 	request(address, data)
+}
+
+func (a API) GetName() string {
+	return a.name
 }
 
 func request(address string, data []byte) []byte {

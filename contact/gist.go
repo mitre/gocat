@@ -26,10 +26,12 @@ var (
 	username string
 )
 
-type GIST struct {}
+type GIST struct {
+	name string
+}
 
 func init() {
-	CommunicationChannels["GIST"] = GIST{}
+	CommunicationChannels["GIST"] = GIST{ name: "GIST" }
 }
 
 //GetInstructions sends a beacon and returns instructions
@@ -72,6 +74,10 @@ func (g GIST) SendExecutionResults(profile map[string]interface{}, result map[st
 	results := [1]map[string]interface{}{result}
 	profileCopy["results"] = results
 	gistResults(profileCopy)
+}
+
+func (g GIST) GetName() string {
+	return g.name
 }
 
 
