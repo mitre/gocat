@@ -15,7 +15,6 @@ import (
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
-	"github.com/mitre/gocat/util"
 )
 
 type AgentInterface interface {
@@ -223,11 +222,11 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 		payload := availablePayloads.Index(i).Elem().String()
 		location := filepath.Join(payload)
 		obtainedPayload := false
-		if util.Exists(location) == false {
+		if fileExists(location) == false {
 			output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
 			payloadBytes := a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
 			if len(payloadBytes) > 0 {
-				util.WritePayloadBytes(location, payloadBytes)
+				writePayloadBytes(location, payloadBytes)
 				obtainedPayload = true
 			}
 		} else {

@@ -1,10 +1,9 @@
 package execute
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
-
-	"github.com/mitre/gocat/util"
 )
 
 const (
@@ -33,7 +32,7 @@ var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
 func RunCommand(command string, payloads []string, executor string, timeout int) ([]byte, string, string){
-	cmd := string(util.Decode(command))
+	cmd, _ := base64.StdEncoding.DecodeString(command)
 	var status string
 	var result []byte
 	var pid string

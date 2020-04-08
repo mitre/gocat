@@ -2,6 +2,7 @@ package contact
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/google/go-github/github"
@@ -11,7 +12,6 @@ import (
 	"time"
 
 	"github.com/mitre/gocat/output"
-	"github.com/mitre/gocat/util"
 )
 
 const (
@@ -50,7 +50,7 @@ func (g GIST) GetPayloadBytes(profile map[string]interface{}, payload string) []
 	var payloadBytes []byte
 	payloads := getGists("payloads", fmt.Sprintf("%s-%s", profile["paw"].(string), payload))
 	if payloads[0] != "" {
-		payloadBytes = util.Decode(payloads[0])
+		payloadBytes, _ = base64.StdEncoding.DecodeString(payloads[0])
 	}
 	return payloadBytes
 }
@@ -86,7 +86,8 @@ func gistBeacon(profile map[string]interface{}) ([]byte, bool) {
 	//collect instructions & delete
 	contents := getGists("instructions", profile["paw"].(string))
 	if contents != nil {
-		return util.Decode(contents[0]), heartbeat
+		decodedContents, _ := base64.StdEncoding.DecodeString(contents[0])
+		return decodedContents, heartbeat
 	}
 	return nil, heartbeat
 }
@@ -122,7 +123,7 @@ func createGist(gistType string, uniqueId string, data []byte) int {
 	ctx := context.Background()
 	c2Client := createNewClient()
 	gistDescriptor := getGistDescriptor(gistType, uniqueId)
-	stringified := string(util.Encode(data))
+	stringified := base64.StdEncoding.EncodeToString(data)
 	file := github.GistFile{Content: &stringified,}
 	files := make(map[github.GistFilename]github.GistFile)
 	files[github.GistFilename(gistDescriptor)] = file
@@ -162,7 +163,7 @@ func getGistDescriptor(gistType string, uniqueId string) string {
 
 func checkValidSleepInterval(profile map[string]interface{}) {
 	if profile["sleep"] == githubTimeout{
-		util.Sleep(float64(githubTimeoutResetInterval))
+		time.Sleep(time.Duration(float64(githubTimeoutResetInterval)) * time.Second)
 	}
 }
 

@@ -2,13 +2,13 @@ package contact
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/mitre/gocat/output"
-	"github.com/mitre/gocat/util"
 )
 
 var (
@@ -87,12 +87,14 @@ func (a API) GetName() string {
 }
 
 func request(address string, data []byte) []byte {
-	req, _ := http.NewRequest("POST", address, bytes.NewBuffer(util.Encode(data)))
+	encodedData := []byte(base64.StdEncoding.EncodeToString(data))
+	req, _ := http.NewRequest("POST", address, bytes.NewBuffer(encodedData))
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil
 	}
 	body, _ := ioutil.ReadAll(resp.Body)
-	return util.Decode(string(body))
+	decodedBody, _ := base64.StdEncoding.DecodeString(string(body))
+	return decodedBody
 }
