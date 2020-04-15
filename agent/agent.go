@@ -55,6 +55,7 @@ type Agent struct {
 	// Communication methods
 	beaconContact contact.Contact
 	heartbeatContact contact.Contact
+	defaultC2 string // Default C2 channel name
 
 	// peer-to-peer info
 	enableP2pReceivers bool
@@ -95,6 +96,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	// Paw will get initialized after successful beacon.
 
 	// Set up contacts
+	a.defaultC2 = "HTTP"
 	return a.SetCommunicationChannels(c2Config)
 }
 
@@ -185,47 +187,32 @@ func (a *Agent) RunInstruction(command map[string]interface{}, payloads []string
 // to HTTP when it is not available,or if no communication channels are available at all, an error will be returned.
 func (a *Agent) SetCommunicationChannels(c2Config map[string]string) error {
 	if len(contact.CommunicationChannels) > 0 {
-		if c2Name, ok := c2Config["c2Name"]; ok {
-			if requestedComs, ok := contact.CommunicationChannels[c2Name]; ok {
-				if requestedComs.C2RequirementsMet(a.GetFullProfile(), c2Config) {
-					a.beaconContact = requestedComs
-					a.heartbeatContact = requestedComs
-					output.VerbosePrint("[*] Set communication channels for sandcat agent.")
-					return nil
-				} else {
-					output.VerbosePrint("[-] C2 requirements not met! Attempting to default to HTTP.")
-					return a.SetDefaultCommunicationChannel(c2Config)
-				}
-			} else {
-				output.VerbosePrint("[-] Requested C2 channel not found. Attempting to default to HTTP.")
-				return a.SetDefaultCommunicationChannel(c2Config)
+		if requestedC2, ok := c2Config["c2Name"]; ok {
+			if err := a.attemptSelectChannel(c2Config, requestedC2); err == nil {
+				return nil
 			}
-		} else {
-			output.VerbosePrint("[-] Invalid C2 Configuration. c2Name not specified. Attempting to default to HTTP.")
-			return a.SetDefaultCommunicationChannel(c2Config)
 		}
-	} else {
-		return errors.New("No possible communication channels found.")
+		output.VerbosePrint(fmt.Sprintf("[*] Attempting to fall back to default C2 channel %s", a.defaultC2))
+		if err := a.attemptSelectChannel(c2Config, a.defaultC2); err == nil {
+			return nil
+		}
 	}
+	return errors.New("No possible communication channels found.")
 }
 
-// Sets backup communication channels in case the requested one isn't available.
-// HTTP will be used as the default communication channel. If HTTP isn't available, or if the C2
-// requirements are not met, then an error is returned.
-func (a *Agent) SetDefaultCommunicationChannel(c2Config map[string]string) error {
-	// Default C2 channel is HTTP
-	if coms, ok := contact.CommunicationChannels["HTTP"]; ok {
-		if coms.C2RequirementsMet(a.GetFullProfile(), c2Config) {
-			a.beaconContact = coms
-			a.heartbeatContact = coms
-			output.VerbosePrint("[*] Defaulted to HTTP as communication channels for sandcat agent.")
-			return nil
-		} else {
-			return errors.New("Default HTTP C2 channel requirements not met.")
-		}
-	} else {
-		return errors.New("Default HTTP C2 channel not available.")
+// Attempts to set a given C2 channel for the agent.
+func (a *Agent) attemptSelectChannel(c2Config map[string]string, requestedChannel string) error {
+	coms, ok := contact.CommunicationChannels[requestedChannel]
+	if !ok {
+		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
+	if coms.C2RequirementsMet(a.GetFullProfile(), c2Config) {
+		a.beaconContact = coms
+		a.heartbeatContact = coms
+		output.VerbosePrint(fmt.Sprintf("[*] Set communication channel to %s", requestedChannel))
+		return nil
+	}
+	return errors.New(fmt.Sprintf("%s channel available, but requirements not met.", requestedChannel))
 }
 
 // Outputs information about the agent.
