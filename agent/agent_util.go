@@ -2,6 +2,8 @@ package agent
 
 import (
 	"os"
+	"os/user"
+	"os/exec"
 )
 
 // Checks for a file
@@ -30,5 +32,17 @@ func writePayloadBytes(location string, payload []byte) error {
 		} else {
 			return nil
 		}
+	}
+}
+
+func getUsername() (string, error) {
+	if userInfo, err := user.Current(); err != nil {
+		if usernameBytes, err := exec.Command("whoami").CombinedOutput(); err == nil {
+			return string(usernameBytes), nil
+		} else {
+			return "", err
+		}
+	} else {
+		return userInfo.Username, nil
 	}
 }

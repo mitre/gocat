@@ -78,7 +78,8 @@ func (a API) SendExecutionResults(profile map[string]interface{}, result map[str
 	for k,v := range profile {
 		profileCopy[k] = v
 	}
-	results := [1]map[string]interface{}{result}
+	results := make([]map[string]interface{}, 1)
+	results[0] = result
 	profileCopy["results"] = results
 	data, err := json.Marshal(profileCopy)
 	if err != nil {
