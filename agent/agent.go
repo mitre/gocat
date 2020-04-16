@@ -59,6 +59,7 @@ type Agent struct {
 
 	// peer-to-peer info
 	enableP2pReceivers bool
+	validP2pReceivers map[string]contact.Contact{}
 }
 
 // Set up agent variables.
@@ -93,7 +94,15 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	}
 	// Set up contacts
 	a.defaultC2 = "HTTP"
-	return a.SetCommunicationChannels(c2Config)
+	if err = a.SetCommunicationChannels(c2Config); err != nil {
+		return err
+	}
+
+	// Set up P2P receivers.
+	if a.enableP2pReceivers {
+		a.ActivateP2pReceivers()
+	}
+	return nil
 }
 
 // Returns full profile for agent.
@@ -164,6 +173,9 @@ func (a *Agent) Heartbeat() {
 func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
 	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
+	if a.enableP2pReceivers {
+		a.TerminateP2pReceivers()
+	}
 }
 
 // Runs a single instruction and send results.
@@ -221,6 +233,15 @@ func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("allow p2p receivers=%v", a.enableP2pReceivers))
 	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
 	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
+	if a.enableP2pReceivers {
+		for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
+			if _ ok := a.validP2pReceivers[receiverName]; ok {
+				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=activated", receiverName))
+			} else {
+				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
+			}
+		}
+	}
 }
 
 // Will download each individual payload listed, write them to disk,
