@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/mitre/gocat/contact"
@@ -60,6 +61,7 @@ type Agent struct {
 
 	// peer-to-peer info
 	enableP2pReceivers bool
+	p2pReceiverWaitGroup *sync.WaitGroup
 	validP2pReceivers map[string]proxy.P2pReceiver
 }
 

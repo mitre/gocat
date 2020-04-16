@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"sync"
+
 	"github.com/mitre/gocat/contact"
 )
 
@@ -16,8 +18,8 @@ const (
 
 // P2pReceiver defines required functions for relaying messages between peers and an upstream peer/c2.
 type P2pReceiver interface {
-	InitializeReceiver(server string, upstreamComs contact.Contact) error
-	RunReceiver()
+	InitializeReceiver(server string, upstreamComs contact.Contact, waitgroup *sync.WaitGroup) error
+	RunReceiver() // must be run as a go routine
 	UpdateUpstreamServer(newServer string)
 	UpdateUpstreamComs(newComs contact.Contact)
 	Terminate()
@@ -34,7 +36,7 @@ type P2pMessage struct {
 	populated bool
 }
 
-// P2pReceiverChannels contains the P2pReceiver implementations
+// P2pReceiverChannels contains the possible P2pReceiver implementations
 var P2pReceiverChannels = map[string]P2pReceiver{}
 
 // Contains the C2 Contact implementations strictly for peer-to-peer communications.
