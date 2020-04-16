@@ -182,13 +182,8 @@ func (a *Agent) SetCommunicationChannels(c2Config map[string]string) error {
 		if requestedC2, ok := c2Config["c2Name"]; ok {
 			if err := a.attemptSelectChannel(c2Config, requestedC2); err == nil {
 				return nil
-			} else {
-				output.VerbosePrint(fmt.Sprintf("[-] %s", err.Error()))
 			}
-		} else {
-			output.VerbosePrint("[-] No requested C2 channel provided.")
 		}
-		output.VerbosePrint(fmt.Sprintf("[*] Attempting to fall back to default C2 channel %s", a.defaultC2))
 		return a.attemptSelectChannel(c2Config, a.defaultC2)
 	}
 	return errors.New("No possible C2 communication channels found.")
