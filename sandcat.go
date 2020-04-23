@@ -14,6 +14,7 @@ with command-line arguments at runtime.
 var (
 	key       = "JWHQZM9Z4HQOYICDHW4OCJAXPPNHBA"
 	server    = "http://localhost:8888"
+	paw       = ""
 	group     = "red"
 	c2Name    = "HTTP"
 	c2Key     = ""
@@ -26,6 +27,7 @@ func main() {
 		parsedListenP2P = false
 	}
 	server := flag.String("server", server, "The FQDN of the server")
+	paw := flag.String("paw", paw, "Optionally specify a PAW on intialization")
 	group := flag.String("group", group, "Attach a group to this agent")
 	c2 := flag.String("c2", c2Name, "C2 Channel for agent")
 	delay := flag.Int("delay", 0, "Delay starting this agent by n-seconds")
@@ -35,5 +37,5 @@ func main() {
 	flag.Parse()
 
 	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key}
-	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose)
+	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose, *paw)
 }
