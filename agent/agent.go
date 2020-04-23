@@ -60,7 +60,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableP2pReceivers bool, initialDelay int) error {
+func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableP2pReceivers bool, initialDelay int, paw string) error {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	host, err := os.Hostname()
 	if err != nil {
@@ -85,8 +85,10 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.enableP2pReceivers = enableP2pReceivers
 	a.initialDelay = float64(initialDelay)
 
-	// Paw will get initialized after successful beacon.
-
+	// Paw will get initialized after successful beacon if it's not specified via command line
+	if paw != "" {
+		a.paw = paw
+	}
 	// Set up contacts
 	a.defaultC2 = "HTTP"
 	return a.SetCommunicationChannels(c2Config)

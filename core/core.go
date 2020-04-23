@@ -14,15 +14,15 @@ import (
 )
 
 // Initializes and returns sandcat agent.
-func initializeCore(server string, group string,c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool) (*agent.Agent, error) {
+func initializeCore(server string, group string,c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool, paw string) (*agent.Agent, error) {
 	output.SetVerbose(verbose)
 	output.VerbosePrint("Starting sandcat in verbose mode.")
-	return agent.AgentFactory(server, group, c2, p2pReceiversOn, initialDelay)
+	return agent.AgentFactory(server, group, c2, p2pReceiversOn, initialDelay, paw)
 }
 
 //Core is the main function as wrapped by sandcat.go
-func Core(server string, group string, delay int, c2 map[string]string, p2pReceiversOn bool, verbose bool) {
-	sandcatAgent, err := initializeCore(server, group, c2, p2pReceiversOn, delay, verbose)
+func Core(server string, group string, delay int, c2 map[string]string, p2pReceiversOn bool, verbose bool, paw string) {
+	sandcatAgent, err := initializeCore(server, group, c2, p2pReceiversOn, delay, verbose, paw)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Error when initializing agent: %s", err.Error()))
 		output.VerbosePrint("[-] Exiting.")
