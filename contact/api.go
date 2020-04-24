@@ -66,9 +66,9 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []b
 }
 
 //C2RequirementsMet determines if sandcat can use the selected comm channel
-func (a API) C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) bool {
+func (a API) C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) (bool, map[string]string) {
 	output.VerbosePrint(fmt.Sprintf("Beacon API=%s", apiBeacon))
-	return true
+	return true, nil
 }
 
 //SendExecutionResults will send the execution results to the server.

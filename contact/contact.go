@@ -9,7 +9,7 @@ const (
 type Contact interface {
 	GetBeaconBytes(profile map[string]interface{}) []byte
 	GetPayloadBytes(profile map[string]interface{}, payload string) []byte
-	C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) bool
+	C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) (bool, map[string]string)
 	SendExecutionResults(profile map[string]interface{}, result map[string]interface{})
 	GetName() string
 }
