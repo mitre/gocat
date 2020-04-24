@@ -197,7 +197,11 @@ func (a *Agent) attemptSelectChannel(c2Config map[string]string, requestedChanne
 	if !ok {
 		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
-	if coms.C2RequirementsMet(a.GetFullProfile(), c2Config) {
+	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), c2Config)
+	if valid {
+		if config != nil {
+			a.modifyAgentConfiguration(config)
+		}
 		a.beaconContact = coms
 		a.heartbeatContact = coms
 		output.VerbosePrint(fmt.Sprintf("[*] Set C2 communication channel to %s", requestedChannel))
@@ -272,4 +276,10 @@ func (a *Agent) GetBeaconContact() contact.Contact {
 
 func (a *Agent) GetHeartbeatContact() contact.Contact {
 	return a.heartbeatContact
+}
+
+func (a *Agent) modifyAgentConfiguration(config map[string]string) {
+	if val, ok := config["paw"]; ok {
+		a.paw = val
+	}
 }
