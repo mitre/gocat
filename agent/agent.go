@@ -228,9 +228,10 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payload := availablePayloads.Index(i).Elem().String()
-		location := filepath.Join(payload)
+		payloadBytes, filename := a.FetchPayloadBytes(payload)
+		location := filepath.Join(filename)
 		if !fileExists(location) {
-			if err := a.WritePayloadToDisk(payload, location); err != nil {
+			if err := a.WritePayloadToDisk(payloadBytes, location); err != nil {
 				output.VerbosePrint(fmt.Sprintf("[-] %s", err.Error()))
 				continue
 			}
@@ -242,8 +243,7 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 
 // Will download the specified payload and write it to disk at the specified location.
 // Assumes file does not already exist.
-func (a *Agent) WritePayloadToDisk(payload string, location string) error {
-	payloadBytes := a.FetchPayloadBytes(payload)
+func (a *Agent) WritePayloadToDisk(payloadBytes []byte, location string) error {
 	if len(payloadBytes) > 0 {
 		return writePayloadBytes(location, payloadBytes)
 	}
@@ -251,7 +251,7 @@ func (a *Agent) WritePayloadToDisk(payload string, location string) error {
 }
 
 // Will request payload bytes from the C2 for the specified payload and return them.
-func (a *Agent) FetchPayloadBytes(payload string) []byte {
+func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
 	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
 	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
 
 	"github.com/mitre/gocat/output"
 )
@@ -39,6 +40,7 @@ func (a API) GetBeaconBytes(profile map[string]interface{}) []byte {
 // Return the file bytes for the requested payload.
 func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
     var payloadBytes []byte
+    var filename string
     server := profile["server"]
     platform := profile["platform"]
     if server != nil && platform != nil {
@@ -55,6 +57,7 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []b
 				buf, err := ioutil.ReadAll(resp.Body)
 				if err == nil {
 					payloadBytes = buf
+					filename = filepath.Join(resp.Header["Filename"][0])
 				} else {
 					output.VerbosePrint(fmt.Sprintf("[-] Error reading HTTP response: %s", err.Error()))
 				}
@@ -62,7 +65,7 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []b
 		}
     }
 
-	return payloadBytes
+	return payloadBytes, filename
 }
 
 //C2RequirementsMet determines if sandcat can use the selected comm channel
