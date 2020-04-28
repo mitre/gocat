@@ -168,8 +168,6 @@ func (a *Agent) Terminate() {
 func (a *Agent) RunInstruction(command map[string]interface{}, payloads []string) {
 	timeout := int(command["timeout"].(float64))
 	result := make(map[string]interface{})
-	// debug
-	output.VerbosePrint(fmt.Sprintf("command: %s, payloads %v", command["command"].(string), payloads))
 	commandOutput, status, pid := execute.RunCommand(command["command"].(string), payloads, command["executor"].(string), timeout)
 	result["id"] = command["id"]
 	result["output"] = commandOutput
