@@ -38,7 +38,7 @@ func (a API) GetBeaconBytes(profile map[string]interface{}) []byte {
 }
 
 // Return the file bytes for the requested payload.
-func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) []byte {
+func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string) {
     var payloadBytes []byte
     var filename string
     server := profile["server"]
