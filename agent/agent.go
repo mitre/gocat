@@ -246,13 +246,11 @@ func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
 		location := filepath.Join(filename)
 		if !fileExists(location) {
 			return location, writePayloadBytes(location, payloadBytes)
-		} else {
-			output.VerbosePrint(fmt.Sprintf("[*] File %s already exists", filename))
-			return location, nil
 		}
-	} else {
-		return "", errors.New(fmt.Sprintf("Failed to fetch payload bytes for payload %s",payload))
+		output.VerbosePrint(fmt.Sprintf("[*] File %s already exists", filename))
+		return location, nil
 	}
+	return "", errors.New(fmt.Sprintf("Failed to fetch payload bytes for payload %s",payload))
 }
 
 // Will request payload bytes from the C2 for the specified payload and return them.
