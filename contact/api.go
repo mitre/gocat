@@ -57,7 +57,11 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]
 				buf, err := ioutil.ReadAll(resp.Body)
 				if err == nil {
 					payloadBytes = buf
-					filename = filepath.Join(resp.Header["Filename"][0])
+					if name_header, ok := resp.Header["Filename"]; ok {
+						filename = filepath.Join(name_header[0])
+					} else {
+						output.VerbosePrint("[-] HTTP response missing Filename header.")
+					}
 				} else {
 					output.VerbosePrint(fmt.Sprintf("[-] Error reading HTTP response: %s", err.Error()))
 				}
