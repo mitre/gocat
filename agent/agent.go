@@ -30,6 +30,8 @@ type AgentInterface interface {
 	Display()
 	DownloadPayloads(payloads []interface{}) []string
 	FetchPayloadBytes(payload string) []byte
+	ActivateP2pReceivers()
+	TerminateP2pReceivers()
 }
 
 // Implements AgentInterface
