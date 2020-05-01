@@ -3,13 +3,12 @@ package agent
 import (
 	"fmt"
 
-	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/proxy"
 )
 
 func (a *Agent) ActivateP2pReceivers() {
-	a.validP2pReceivers = make(map[string]contact.Contact{})
+	a.validP2pReceivers = make(map[string]proxy.P2pReceiver)
 	for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
 		if err := p2pReceiver.InitializeReceiver(a.server, a.beaconContact); err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Error when initializing p2p receiver %s: %s", receiverName, err.Error()))

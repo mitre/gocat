@@ -16,6 +16,7 @@ import (
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
+	"github.com/mitre/gocat/proxy"
 )
 
 type AgentInterface interface {
@@ -59,7 +60,7 @@ type Agent struct {
 
 	// peer-to-peer info
 	enableP2pReceivers bool
-	validP2pReceivers map[string]contact.Contact{}
+	validP2pReceivers map[string]proxy.P2pReceiver
 }
 
 // Set up agent variables.
@@ -234,8 +235,8 @@ func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
 	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
 	if a.enableP2pReceivers {
-		for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
-			if _ ok := a.validP2pReceivers[receiverName]; ok {
+		for receiverName, _ := range proxy.P2pReceiverChannels {
+			if _, ok := a.validP2pReceivers[receiverName]; ok {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=activated", receiverName))
 			} else {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
