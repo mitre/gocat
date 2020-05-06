@@ -34,14 +34,6 @@ func init() {
 	P2pReceiverChannels[httpProxyName] = &HttpReceiver{}
 }
 
-/*
-InitializeReceiver(server string, upstreamComs contact.Contact) error
-RunReceiver()
-UpdateUpstreamServer(newServer string)
-UpdateUpstreamComs(newComs contact.Contact)
-Terminate()
-*/
-
 func (h *HttpReceiver) InitializeReceiver(server string, upstreamComs contact.Contact, waitgroup *sync.WaitGroup) error {
 	// Make sure the agent uses HTTP with the C2.
 	switch upstreamComs.(type) {
@@ -73,11 +65,8 @@ func (h *HttpReceiver) Terminate() {
 		h.waitgroup.Done()
 		h.receiverCancelFunc()
 	}()
-
 	if err := h.httpServer.Shutdown(h.receiverContext); err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Error when shutting down HTTP receiver server: %s", err.Error()))
-	} else {
-		output.VerbosePrint("[-] Shut down HTTP receiver server.")
 	}
 }
 
@@ -96,11 +85,9 @@ func (h *HttpReceiver) UpdateUpstreamComs(newComs contact.Contact) {
 
 // Helper method for StartReceiver. Starts HTTP proxy to forward messages from peers to the C2 server.
 func (h *HttpReceiver) startHttpProxy() {
-	defer h.waitgroup.Done()
 	listenPort := ":" + strconv.Itoa(h.port)
 	proxyHandler := func(writer http.ResponseWriter, reader *http.Request) {
 		// Get data from the message that client peer sent.
-		httpClient := http.Client{}
 		body, err := ioutil.ReadAll(reader.Body)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
@@ -108,29 +95,57 @@ func (h *HttpReceiver) startHttpProxy() {
 		}
 		reader.Body = ioutil.NopCloser(bytes.NewReader(body))
 
-		// Determine where to forward the request.
-		url := h.upstreamServer + reader.RequestURI
-
 		// Forward the request to the C2 server, and send back the response.
-		proxyReq, err := http.NewRequest(reader.Method, url, bytes.NewReader(body))
-		if err != nil {
-			output.VerbosePrint(fmt.Sprintf("[-] Error creating new HTTP request: %s", err.Error()))
-			return
-		}
-		proxyReq.Header = make(http.Header)
-		for header, val := range reader.Header {
-			proxyReq.Header[header] = val
-		}
-		resp, err := httpClient.Do(proxyReq)
+		resp, err := h.forwardRequestUpstream(body, writer, reader)
 		if err != nil {
 			http.Error(writer, err.Error(), http.StatusBadGateway)
+			output.VerbosePrint(fmt.Sprintf("[-] Error forwarding HTTP request: %s", err.Error()))
 			return
 		}
-		defer resp.Body.Close()
-		bites, _ := ioutil.ReadAll(resp.Body)
-		writer.Write(bites)
+		if err = h.forwardResponseDownstream(resp, writer); err!= nil {
+			http.Error(writer, err.Error(), http.StatusBadGateway)
+			output.VerbosePrint(fmt.Sprintf("[-] Error forwarding HTTP response: %s", err.Error()))
+		}
 	}
 	http.HandleFunc("/", proxyHandler)
-	output.VerbosePrint(listenPort + "ddd")
-	output.VerbosePrint(fmt.Sprintf("[*] %s", http.ListenAndServe(listenPort, nil)))
+	if err := http.ListenAndServe(listenPort, nil); err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] HTTP proxy error: %s", err.Error()))
+	}
+}
+
+// Helper method for startHttpProxy that will forward the HTTP request upstream. Returns the response.
+func (h *HttpReceiver) forwardRequestUpstream(body []byte, writer http.ResponseWriter, reader *http.Request) (*http.Response, error) {
+	// Determine where to forward the request.
+	url := h.upstreamServer + reader.RequestURI
+
+	// Forward the request to the C2 server, and send back the response.
+	httpClient := http.Client{}
+	proxyReq, err := http.NewRequest(reader.Method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	// Copy headers received from client.
+	proxyReq.Header = make(http.Header)
+	for header, val := range reader.Header {
+		proxyReq.Header[header] = val
+	}
+	return httpClient.Do(proxyReq)
+}
+
+func (h *HttpReceiver) forwardResponseDownstream(resp *http.Response, writer http.ResponseWriter) error {
+	// Send back headers received from upstream.
+	for header, val := range resp.Header {
+		writer.Header().Set(header, val[0])
+		for i := 1; i < len(val); i++ {
+			writer.Header().Add(header, val[i])
+		}
+	}
+	defer resp.Body.Close()
+	bites, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	_, err = writer.Write(bites)
+	return err
 }
