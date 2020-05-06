@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"io/ioutil"
 	"sync"
@@ -38,12 +39,23 @@ func (h *HttpReceiver) InitializeReceiver(server string, upstreamComs contact.Co
 	// Make sure the agent uses HTTP with the C2.
 	switch upstreamComs.(type) {
 	case contact.API:
-		h.upstreamServer = server
 		h.port = defaultPort
+		bindPortStr := ":" + strconv.Itoa(h.port)
+
+		// Check if port is already in use.
+		ln, err := net.Listen("tcp", bindPortStr)
+		if err != nil {
+			return err
+		}
+		err = ln.Close()
+		if err != nil {
+			return err
+		}
+		h.upstreamServer = server
 		h.receiverName = httpProxyName
 		h.upstreamComs = upstreamComs
 		h.httpServer = &http.Server{
-			Addr: ":" + string(h.port),
+			Addr: bindPortStr,
 			Handler: nil,
 		}
 		h.waitgroup = waitgroup
