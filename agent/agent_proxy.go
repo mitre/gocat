@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/proxy"
@@ -9,13 +10,15 @@ import (
 
 func (a *Agent) ActivateP2pReceivers() {
 	a.validP2pReceivers = make(map[string]proxy.P2pReceiver)
+	a.p2pReceiverWaitGroup = &sync.WaitGroup{}
 	for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
-		if err := p2pReceiver.InitializeReceiver(a.server, a.beaconContact); err != nil {
+		if err := p2pReceiver.InitializeReceiver(a.server, a.beaconContact, a.p2pReceiverWaitGroup); err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Error when initializing p2p receiver %s: %s", receiverName, err.Error()))
 		} else {
 			output.VerbosePrint(fmt.Sprintf("[*] Initialized p2p receiver %s", receiverName))
 			a.validP2pReceivers[receiverName] = p2pReceiver
-			p2pReceiver.RunReceiver()
+			a.p2pReceiverWaitGroup.Add(1)
+			go p2pReceiver.RunReceiver()
 		}
 	}
 }
@@ -25,4 +28,5 @@ func (a *Agent) TerminateP2pReceivers() {
 		output.VerbosePrint(fmt.Sprintf("[*] Terminating p2p receiver %s", receiverName))
 		p2pReceiver.Terminate()
 	}
+	a.p2pReceiverWaitGroup.Wait()
 }
