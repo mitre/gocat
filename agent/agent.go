@@ -317,4 +317,7 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 	if val, ok := config["paw"]; ok {
 		a.paw = val
 	}
+	if val, ok := config["server"]; ok {
+		a.server = val
+	}
 }

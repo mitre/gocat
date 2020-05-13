@@ -18,7 +18,8 @@ func buildP2pMsgBytes(sourcePaw string, messageType int, payload []byte, srcAddr
 // Convert bytes of JSON marshal into P2pMessage struct
 func bytesToP2pMsg(data []byte) (P2pMessage, error) {
 	var message P2pMessage
-	if err := json.Unmarshal(data, &message); err == nil {
+	if err := json.Unmarshal(data, &message); err == nil && len(data) > 0 {
+		message.populated = true
 		return message, nil
 	} else {
 		return message, err
