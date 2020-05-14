@@ -23,6 +23,7 @@ type P2pReceiver interface {
 	UpdateUpstreamServer(newServer string)
 	UpdateUpstreamComs(newComs contact.Contact)
 	Terminate()
+	GetReceiverAddresses() []string
 }
 
 // P2pClient will implement the contact.Contact interface.

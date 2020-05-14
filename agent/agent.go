@@ -244,6 +244,9 @@ func (a *Agent) Display() {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
 			}
 		}
+		for _, receiverInfo := range a.getProxyReceiverList() {
+			output.VerbosePrint(fmt.Sprintf("%s proxy receiver available at %s", receiverInfo[0], receiverInfo[1]))
+		}
 	}
 }
 

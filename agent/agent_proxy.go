@@ -30,3 +30,17 @@ func (a *Agent) TerminateP2pReceivers() {
 	}
 	a.p2pReceiverWaitGroup.Wait()
 }
+
+// Returns list of 2-tuple lists of form ["proxy protocol", "proxy receiver address"]
+func (a *Agent) getProxyReceiverList() [][]string {
+	var returnList [][]string
+	for receiverName, p2pReceiver := range a.validP2pReceivers {
+		for _, address := range p2pReceiver.GetReceiverAddresses() {
+			proxyInfo := make([]string, 2)
+			proxyInfo[0] = receiverName
+			proxyInfo[1] = address
+			returnList = append(returnList, proxyInfo)
+		}
+	}
+	return returnList
+}
