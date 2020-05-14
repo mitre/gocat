@@ -159,6 +159,12 @@ func (s *SmbPipeReceiver) Terminate() {
 	}
 }
 
+func (s *SmbPipeReceiver) GetReceiverAddresses() []string {
+	addrList := make([]string, 1)
+	addrList[0] = s.externalMainPipePath
+	return addrList
+}
+
 // Helper method for StartReceiver.
 func (s *SmbPipeReceiver) startReceiverHelper() {
 	// Whenever a client connects to pipe with a request, process the request using a go routine.
