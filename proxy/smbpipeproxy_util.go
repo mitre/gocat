@@ -13,9 +13,10 @@ import (
 	"time"
 
 	"github.com/mitre/gocat/output"
-	"github.com/mitre/gocat/winio"
-)
 
+	"gopkg.in/natefinch/npipe.v2"
+)
+	
 /*
  * SMB Read/Write helper functions
  */
@@ -43,7 +44,7 @@ func getResponseMessage(listener net.Listener) (P2pMessage, error) {
 func sendDataToPipe(pipePath string, data []byte) (int, error) {
 	// Connect to pipe.
 	timeout := pipeDialTimeoutSec * time.Second
-	conn, err := winio.DialPipe(pipePath, &timeout)
+	conn, err := npipe.DialTimeout(pipePath, timeout)
     if err != nil {
         return 0, err
     }
@@ -207,10 +208,7 @@ func createNewReturnMailBox() (string, net.Listener, error) {
 
 // Helper function that listens on pipe and returns listener and any error.
 func listenPipeFullAccess(pipePath string) (net.Listener, error) {
-    config := &winio.PipeConfig{
-        SecurityDescriptor: "D:(A;;GA;;;S-1-1-0)", // File all access to everyone.
-    }
-    return winio.ListenPipe(pipePath, config)
+    return npipe.Listen(pipePath)
 }
 
 // Helper function that creates random pipename of random length, using specified seed.
