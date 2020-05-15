@@ -203,7 +203,7 @@ func (s *SmbPipeReceiver) forwardGetBeaconBytes(message P2pMessage) {
     	return
     }
     clientProfile["server"] = s.upstreamServer // make sure we send the instructions to the right place.
-    output.VerbosePrint(fmt.Sprintf("[*] Forwarding instructions request to %s on behalf of paw %s", s.upstreamServer, message.SourcePaw))
+    output.VerbosePrint(fmt.Sprintf("[*] Forwarding instructions request to on behalf of paw %s", message.SourcePaw))
     response := s.upstreamComs.GetBeaconBytes(clientProfile)
 
     // Connect to client mailbox to send response back to client.
@@ -217,7 +217,7 @@ func (s *SmbPipeReceiver) forwardGetBeaconBytes(message P2pMessage) {
 			output.VerbosePrint(fmt.Sprintf("[!] Error sending response message to client: %s", err.Error()))
     		return
         }
-        output.VerbosePrint(fmt.Sprintf("[*] Sent beacon response for paw %s via mailbox %s", message.SourcePaw, message.SourceAddress))
+        output.VerbosePrint(fmt.Sprintf("[*] Sent beacon response to paw %s", message.SourcePaw))
     } else {
         output.VerbosePrint(fmt.Sprintf("[-] ERROR. P2p message from client did not specify a return address."))
     }
@@ -231,7 +231,6 @@ func (s *SmbPipeReceiver) forwardPayloadBytesDownload(message P2pMessage) {
 		output.VerbosePrint(fmt.Sprintf("[!] Error extracting payload request info from p2p message: %s", err.Error()))
     	return
     }
-    output.VerbosePrint(fmt.Sprintf("Received payload request: %v", requestInfo))
 
     // Get upstream response, which contains payload data and name, and forward response to client.
     if requestInfo.Profile == nil {
@@ -245,7 +244,6 @@ func (s *SmbPipeReceiver) forwardPayloadBytesDownload(message P2pMessage) {
    	requestInfo.Profile["server"] = s.upstreamServer // Make sure request gets sent to the right place.
     output.VerbosePrint(fmt.Sprintf("[*] Forwarding payload bytes request for payload %s on behalf of paw %s", requestInfo.PayloadName, message.SourcePaw))
     payloadData, payloadName := s.upstreamComs.GetPayloadBytes(requestInfo.Profile, requestInfo.PayloadName)
-    output.VerbosePrint(fmt.Sprintf("[*] Received %d bytes for file %s from upstream", len(payloadData), payloadName))
     respInfo := payloadResponseInfo{
     	PayloadData: payloadData,
     	PayloadName: payloadName,
@@ -262,7 +260,7 @@ func (s *SmbPipeReceiver) forwardPayloadBytesDownload(message P2pMessage) {
     		return
         }
         sendDataToPipe(message.SourceAddress, pipeMsgData)
-        output.VerbosePrint(fmt.Sprintf("[*] Sent %d payload bytes for payload %s to client paw %s via mailbox %s", len(payloadData), payloadName, message.SourcePaw, message.SourceAddress))
+        output.VerbosePrint(fmt.Sprintf("[*] Sent %d payload bytes for payload %s to client paw %s", len(payloadData), payloadName, message.SourcePaw))
     } else {
         output.VerbosePrint(fmt.Sprintf("[-] ERROR. P2p message from client did not specify a return address."))
     }
@@ -382,7 +380,7 @@ func (s *SmbPipeAPI) GetPayloadBytes(profile map[string]interface{}, payload str
 	// Message payload contains payload bytes and true filename.
 	var responseInfo payloadResponseInfo
 	if err = json.Unmarshal(respMessage.Payload, &responseInfo); err != nil {
-		output.VerbosePrint(fmt.Sprintf("[!] Error unmarshaling payload response info: %s", err.Error()))
+		output.VerbosePrint(fmt.Sprintf("[!] Error unmarshalling payload response info: %s", err.Error()))
     	return nil, ""
 	}
     if len(responseInfo.PayloadName) == 0 {

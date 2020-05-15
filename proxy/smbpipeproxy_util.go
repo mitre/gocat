@@ -16,7 +16,7 @@ import (
 
 	"gopkg.in/natefinch/npipe.v2"
 )
-	
+
 /*
  * SMB Read/Write helper functions
  */
