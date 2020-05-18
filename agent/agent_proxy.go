@@ -10,6 +10,7 @@ import (
 
 func (a *Agent) ActivateP2pReceivers() {
 	a.validP2pReceivers = make(map[string]proxy.P2pReceiver)
+	a.p2pReceiverAddresses = make(map[string][]string)
 	a.p2pReceiverWaitGroup = &sync.WaitGroup{}
 	for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
 		if err := p2pReceiver.InitializeReceiver(a.server, a.beaconContact, a.p2pReceiverWaitGroup); err != nil {
@@ -18,6 +19,12 @@ func (a *Agent) ActivateP2pReceivers() {
 			output.VerbosePrint(fmt.Sprintf("[*] Initialized p2p receiver %s", receiverName))
 			a.validP2pReceivers[receiverName] = p2pReceiver
 			a.p2pReceiverWaitGroup.Add(1)
+			for _, address := range p2pReceiver.GetReceiverAddresses() {
+				if _, ok := a.p2pReceiverAddresses[receiverName]; !ok {
+					a.p2pReceiverAddresses[receiverName] = make([]string, 0)
+				}
+				a.p2pReceiverAddresses[receiverName] = append(a.p2pReceiverAddresses[receiverName], address)
+			}
 			go p2pReceiver.RunReceiver()
 		}
 	}
@@ -29,18 +36,4 @@ func (a *Agent) TerminateP2pReceivers() {
 		p2pReceiver.Terminate()
 	}
 	a.p2pReceiverWaitGroup.Wait()
-}
-
-// Returns list of 2-tuple lists of form ["proxy protocol", "proxy receiver address"]
-func (a *Agent) getProxyReceiverList() [][]string {
-	var returnList [][]string
-	for receiverName, p2pReceiver := range a.validP2pReceivers {
-		for _, address := range p2pReceiver.GetReceiverAddresses() {
-			proxyInfo := make([]string, 2)
-			proxyInfo[0] = receiverName
-			proxyInfo[1] = address
-			returnList = append(returnList, proxyInfo)
-		}
-	}
-	return returnList
 }

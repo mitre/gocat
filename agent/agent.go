@@ -63,7 +63,7 @@ type Agent struct {
 	enableP2pReceivers bool
 	p2pReceiverWaitGroup *sync.WaitGroup
 	validP2pReceivers map[string]proxy.P2pReceiver
-	p2pReceiverAddresses [][]string
+	p2pReceiverAddresses map[string][]string // maps P2P protocol to list of receiver addresses.
 }
 
 // Set up agent variables.
@@ -105,7 +105,6 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	// Set up P2P receivers.
 	if a.enableP2pReceivers {
 		a.ActivateP2pReceivers()
-		a.p2pReceiverAddresses = a.getProxyReceiverList()
 	}
 	return nil
 }
@@ -247,8 +246,10 @@ func (a *Agent) Display() {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
 			}
 		}
-		for _, receiverInfo := range a.p2pReceiverAddresses {
-			output.VerbosePrint(fmt.Sprintf("%s proxy receiver available at %s", receiverInfo[0], receiverInfo[1]))
+		for protocol, addressList := range a.p2pReceiverAddresses {
+			for _, address := range addressList {
+				output.VerbosePrint(fmt.Sprintf("%s proxy receiver available at %s", protocol, address))
+			}
 		}
 	}
 }
