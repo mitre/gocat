@@ -19,12 +19,7 @@ func (a *Agent) ActivateP2pReceivers() {
 			output.VerbosePrint(fmt.Sprintf("[*] Initialized p2p receiver %s", receiverName))
 			a.validP2pReceivers[receiverName] = p2pReceiver
 			a.p2pReceiverWaitGroup.Add(1)
-			for _, address := range p2pReceiver.GetReceiverAddresses() {
-				if _, ok := a.p2pReceiverAddresses[receiverName]; !ok {
-					a.p2pReceiverAddresses[receiverName] = make([]string, 0)
-				}
-				a.p2pReceiverAddresses[receiverName] = append(a.p2pReceiverAddresses[receiverName], address)
-			}
+			a.storeP2pReceiverAddresses(receiverName, p2pReceiver)
 			go p2pReceiver.RunReceiver()
 		}
 	}
@@ -36,4 +31,13 @@ func (a *Agent) TerminateP2pReceivers() {
 		p2pReceiver.Terminate()
 	}
 	a.p2pReceiverWaitGroup.Wait()
+}
+
+func (a *Agent) storeP2pReceiverAddresses(receiverName string, p2pReceiver proxy.P2pReceiver) {
+	for _, address := range p2pReceiver.GetReceiverAddresses() {
+		if _, ok := a.p2pReceiverAddresses[receiverName]; !ok {
+			a.p2pReceiverAddresses[receiverName] = make([]string, 0)
+		}
+		a.p2pReceiverAddresses[receiverName] = append(a.p2pReceiverAddresses[receiverName], address)
+	}
 }
