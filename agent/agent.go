@@ -64,6 +64,7 @@ type Agent struct {
 	p2pReceiverWaitGroup *sync.WaitGroup
 	validP2pReceivers map[string]proxy.P2pReceiver
 	p2pReceiverAddresses map[string][]string // maps P2P protocol to list of receiver addresses.
+	availablePeerReceivers map[string][]string
 }
 
 // Set up agent variables.
@@ -105,6 +106,11 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	// Set up P2P receivers.
 	if a.enableP2pReceivers {
 		a.ActivateP2pReceivers()
+	}
+
+	a.availablePeerReceivers, err = proxy.GetAvailableReceivers()
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -248,8 +254,13 @@ func (a *Agent) Display() {
 		}
 		for protocol, addressList := range a.p2pReceiverAddresses {
 			for _, address := range addressList {
-				output.VerbosePrint(fmt.Sprintf("%s proxy receiver available at %s", protocol, address))
+				output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
 			}
+		}
+	}
+	for protocol, addressList := range a.availablePeerReceivers {
+		for _, address := range addressList {
+			output.VerbosePrint(fmt.Sprintf("%s peer proxy receiver available at %s", protocol, address))
 		}
 	}
 }
