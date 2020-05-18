@@ -37,8 +37,17 @@ type P2pMessage struct {
 	populated bool
 }
 
-// P2pReceiverChannels contains the possible P2pReceiver implementations
-var P2pReceiverChannels = map[string]P2pReceiver{}
+var (
+	// P2pReceiverChannels contains the possible P2pReceiver implementations
+	P2pReceiverChannels = map[string]P2pReceiver{}
 
-// Contains the C2 Contact implementations strictly for peer-to-peer communications.
-var P2pClientChannels = map[string]contact.Contact{}
+	// Contains the C2 Contact implementations strictly for peer-to-peer communications.
+	P2pClientChannels = map[string]contact.Contact{}
+
+	// Contains the base64-encoded JSON-dumped list of available proxy receiver information
+	// in the form [["Proxy protocol 1","Proxy receiver 1"], ... ["Proxy protocol N","Proxy receiver N"]]
+	encodedReceivers = ""
+
+	// XOR key for the encoded proxy receiver info.
+	receiverKey = ""
+)
