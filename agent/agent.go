@@ -23,7 +23,7 @@ import (
 type AgentInterface interface {
 	Heartbeat()
 	Beacon() map[string]interface{}
-	Initialize(server string, group string, c2Config map[string]string, enableP2pReceivers bool) error
+	Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool) error
 	RunInstruction(command map[string]interface{}, payloads []string)
 	Terminate()
 	GetFullProfile() map[string]interface{}
@@ -60,15 +60,15 @@ type Agent struct {
 	defaultC2 string // Default C2 channel name
 
 	// peer-to-peer info
-	enableP2pReceivers bool
+	enableLocalP2pReceivers bool
 	p2pReceiverWaitGroup *sync.WaitGroup
-	validP2pReceivers map[string]proxy.P2pReceiver
-	p2pReceiverAddresses map[string][]string // maps P2P protocol to list of receiver addresses.
-	availablePeerReceivers map[string][]string
+	localP2pReceivers map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
+	localP2pReceiverAddresses map[string][]string // maps P2P protocol to receiver addresses listening on this machine
+	availablePeerReceivers map[string][]string // maps P2P protocol to receiver addresses running on peer machines
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableP2pReceivers bool, initialDelay int, paw string) error {
+func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string) error {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	host, err := os.Hostname()
 	if err != nil {
@@ -90,7 +90,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.executors = execute.AvailableExecutors()
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
-	a.enableP2pReceivers = enableP2pReceivers
+	a.enableLocalP2pReceivers = enableLocalP2pReceivers
 	a.initialDelay = float64(initialDelay)
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
@@ -104,11 +104,11 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	}
 
 	// Set up P2P receivers.
-	if a.enableP2pReceivers {
+	if a.enableLocalP2pReceivers {
 		a.ActivateP2pReceivers()
 	}
 
-	a.availablePeerReceivers, err = proxy.GetAvailableReceivers()
+	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
 	if err != nil {
 		return err
 	}
@@ -131,7 +131,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"executors": a.executors,
 		"privilege": a.privilege,
 		"exe_name": a.exe_name,
-		"proxy_receivers": a.p2pReceiverAddresses,
+		"proxy_receivers": a.localP2pReceiverAddresses,
 	}
 }
 
@@ -184,7 +184,7 @@ func (a *Agent) Heartbeat() {
 func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
 	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
-	if a.enableP2pReceivers {
+	if a.enableLocalP2pReceivers {
 		a.TerminateP2pReceivers()
 	}
 }
@@ -241,18 +241,18 @@ func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("server=%s", a.server))
 	output.VerbosePrint(fmt.Sprintf("group=%s", a.group))
 	output.VerbosePrint(fmt.Sprintf("privilege=%s", a.privilege))
-	output.VerbosePrint(fmt.Sprintf("allow p2p receivers=%v", a.enableP2pReceivers))
+	output.VerbosePrint(fmt.Sprintf("allow local p2p receivers=%v", a.enableLocalP2pReceivers))
 	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
 	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
-	if a.enableP2pReceivers {
+	if a.enableLocalP2pReceivers {
 		for receiverName, _ := range proxy.P2pReceiverChannels {
-			if _, ok := a.validP2pReceivers[receiverName]; ok {
+			if _, ok := a.localP2pReceivers[receiverName]; ok {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=activated", receiverName))
 			} else {
 				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
 			}
 		}
-		for protocol, addressList := range a.p2pReceiverAddresses {
+		for protocol, addressList := range a.localP2pReceiverAddresses {
 			for _, address := range addressList {
 				output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
 			}

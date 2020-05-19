@@ -40,8 +40,8 @@ func decodeXor(ciphertext string, xorKey string) string {
 	return decoded
 }
 
-// Returns map mapping proxy receiver protocol to list of receiver addresses.
-func GetAvailableReceivers() (map[string][]string, error) {
+// Returns map mapping proxy receiver protocol to list of peer receiver addresses.
+func GetAvailablePeerReceivers() (map[string][]string, error) {
 	peerReceiverInfo := make(map[string][]string)
 	if len(encodedReceivers) > 0 && len(receiverKey) > 0 {
 		ciphertext, err := base64.StdEncoding.DecodeString(encodedReceivers)
