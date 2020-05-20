@@ -47,9 +47,6 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 		if len(beacon) != 0 {
 			sandcatAgent.SetPaw(beacon["paw"].(string))
 			checkin = time.Now()
-
-			// We have established comms. Run p2p receivers if allowed.
-			// TODO
 		}
 		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
 			// Run commands and send results.
@@ -72,6 +69,11 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 				sleepDuration = float64(beacon["sleep"].(int))
 				watchdog = beacon["watchdog"].(int)
 			} else {
+				// Failed beacon
+				if err := sandcatAgent.HandleBeaconFailure(); err != nil {
+					output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
+					return
+				}
 				sleepDuration = float64(15)
 			}
 			sandcatAgent.Sleep(sleepDuration)
