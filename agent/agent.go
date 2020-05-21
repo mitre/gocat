@@ -293,14 +293,6 @@ func (a *Agent) displayLocalReceiverInformation() {
 	}
 }
 
-func (a *Agent) displayPeerReceiverInformation() {
-	for protocol, addressList := range a.availablePeerReceivers {
-		for _, address := range addressList {
-			output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
-		}
-	}
-}
-
 // Will download each individual payload listed, write them to disk,
 // and will return the full file paths of each downloaded payload.
 func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
