@@ -32,8 +32,8 @@ type AgentInterface interface {
 	Display()
 	DownloadPayloads(payloads []interface{}) []string
 	FetchPayloadBytes(payload string) []byte
-	ActivateP2pReceivers()
-	TerminateP2pReceivers()
+	ActivateLocalP2pReceivers()
+	TerminateLocalP2pReceivers()
 }
 
 // Implements AgentInterface
@@ -57,7 +57,6 @@ type Agent struct {
 	// Communication methods
 	beaconContact contact.Contact
 	heartbeatContact contact.Contact
-	defaultC2 string // Default C2 channel name
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -98,14 +97,16 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 		a.paw = paw
 	}
 	// Set up contacts
-	a.defaultC2 = "HTTP"
 	if err = a.SetCommunicationChannels(c2Config); err != nil {
 		return err
 	}
 
 	// Set up P2P receivers.
 	if a.enableLocalP2pReceivers {
-		a.ActivateP2pReceivers()
+		a.localP2pReceivers = make(map[string]proxy.P2pReceiver)
+		a.localP2pReceiverAddresses = make(map[string][]string)
+		a.p2pReceiverWaitGroup = &sync.WaitGroup{}
+		a.ActivateLocalP2pReceivers()
 	}
 
 	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
@@ -185,7 +186,7 @@ func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
 	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
 	if a.enableLocalP2pReceivers {
-		a.TerminateP2pReceivers()
+		a.TerminateLocalP2pReceivers()
 	}
 }
 
@@ -201,35 +202,36 @@ func (a *Agent) RunInstruction(command map[string]interface{}, payloads []string
  	a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 }
 
-// Sets the C2 communication channels for the agent according to the specified C2 configuration map.
-// Will default to HTTP if requested C2 is not available or its requirements aren't met. If defaulting
-// to HTTP when it is not available,or if no communication channels are available at all, an error will be returned.
-func (a *Agent) SetCommunicationChannels(c2Config map[string]string) error {
+// Sets the communication channels for the agent according to the specified channel configuration map.
+// Will resort to peer-to-peer if agent doesn't support the requested channel or if the C2's requirements
+// are not met. If the original requested channel cannot be used and there are no compatible peer proxy receivers,
+// then an error will be returned.
+// This method does not test connectivity to the requested server or to proxy receivers.
+func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]string) error {
 	if len(contact.CommunicationChannels) > 0 {
-		if requestedC2, ok := c2Config["c2Name"]; ok {
-			if err := a.attemptSelectChannel(c2Config, requestedC2); err == nil {
+		if requestedChannel, ok := requestedChannelConfig["c2Name"]; ok {
+			if err := a.attemptSelectComChannel(requestedChannelConfig, requestedChannel); err == nil {
 				return nil
 			}
 		}
-		return a.attemptSelectChannel(c2Config, a.defaultC2)
 	}
 	return errors.New("No possible C2 communication channels found.")
 }
 
-// Attempts to set a given C2 channel for the agent.
-func (a *Agent) attemptSelectChannel(c2Config map[string]string, requestedChannel string) error {
+// Attempts to set a given communication channel for the agent.
+func (a *Agent) attemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error {
 	coms, ok := contact.CommunicationChannels[requestedChannel]
+	output.VerbosePrint(fmt.Sprintf("[*] Attempting to set channel %s", requestedChannel))
 	if !ok {
 		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
-	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), c2Config)
+	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), requestedChannelConfig)
 	if valid {
 		if config != nil {
 			a.modifyAgentConfiguration(config)
 		}
-		a.beaconContact = coms
-		a.heartbeatContact = coms
-		output.VerbosePrint(fmt.Sprintf("[*] Set C2 communication channel to %s", requestedChannel))
+		a.updateUpstreamComs(coms)
+		output.VerbosePrint(fmt.Sprintf("[*] Set communication channel to %s", requestedChannel))
 		return nil
 	}
 	return errors.New(fmt.Sprintf("%s channel available, but requirements not met.", requestedChannel))
@@ -245,19 +247,27 @@ func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
 	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
 	if a.enableLocalP2pReceivers {
-		for receiverName, _ := range proxy.P2pReceiverChannels {
-			if _, ok := a.localP2pReceivers[receiverName]; ok {
-				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=activated", receiverName))
-			} else {
-				output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
-			}
-		}
-		for protocol, addressList := range a.localP2pReceiverAddresses {
-			for _, address := range addressList {
-				output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
-			}
+		a.displayLocalReceiverInformation()
+	}
+	a.displayPeerReceiverInformation()
+}
+
+func (a *Agent) displayLocalReceiverInformation() {
+	for receiverName, _ := range proxy.P2pReceiverChannels {
+		if _, ok := a.localP2pReceivers[receiverName]; ok {
+			output.VerbosePrint(fmt.Sprintf("P2p receiver %s=activated", receiverName))
+		} else {
+			output.VerbosePrint(fmt.Sprintf("P2p receiver %s=NOT activated", receiverName))
 		}
 	}
+	for protocol, addressList := range a.localP2pReceiverAddresses {
+		for _, address := range addressList {
+			output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
+		}
+	}
+}
+
+func (a *Agent) displayPeerReceiverInformation() {
 	for protocol, addressList := range a.availablePeerReceivers {
 		for _, address := range addressList {
 			output.VerbosePrint(fmt.Sprintf("%s peer proxy receiver available at %s", protocol, address))
@@ -328,5 +338,24 @@ func (a *Agent) GetHeartbeatContact() contact.Contact {
 func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 	if val, ok := config["paw"]; ok {
 		a.paw = val
+	}
+}
+
+func (a *Agent) updateUpstreamServer(newServer string) {
+	a.server = newServer
+	if a.localP2pReceivers != nil {
+		for _, receiver := range a.localP2pReceivers {
+			receiver.UpdateUpstreamServer(newServer)
+		}
+	}
+}
+
+func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
+	a.beaconContact = newComs
+	a.heartbeatContact = newComs
+	if a.localP2pReceivers != nil {
+		for _, receiver := range a.localP2pReceivers {
+			receiver.UpdateUpstreamComs(newComs)
+		}
 	}
 }
