@@ -12,7 +12,7 @@ func buildP2pMsgBytes(sourcePaw string, messageType int, payload []byte, srcAddr
 		SourceAddress: srcAddr,
 		MessageType: messageType,
 		Payload: payload,
-		populated: true,
+		Populated: true,
 	}
 	return json.Marshal(p2pMsg)
 }
@@ -28,7 +28,7 @@ func bytesToP2pMsg(data []byte) (P2pMessage, error) {
 
 // Check if message is empty.
 func msgIsEmpty(msg P2pMessage) bool {
-	return !msg.populated
+	return !msg.Populated
 }
 
 func decodeXor(ciphertext string, xorKey string) string {
