@@ -34,7 +34,7 @@ type P2pMessage struct {
 	SourceAddress string // return address for responses (e.g. IP + port, pipe path)
 	MessageType int
 	Payload []byte
-	populated bool
+	Populated bool
 }
 
 var (
