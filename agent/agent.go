@@ -20,6 +20,8 @@ import (
 	"github.com/mitre/gocat/proxy"
 )
 
+var beaconFailureThreshold = 3
+
 type AgentInterface interface {
 	Heartbeat()
 	Beacon() map[string]interface{}
@@ -34,6 +36,7 @@ type AgentInterface interface {
 	FetchPayloadBytes(payload string) []byte
 	ActivateLocalP2pReceivers()
 	TerminateLocalP2pReceivers()
+	HandleBeaconFailure() error
 }
 
 // Implements AgentInterface
@@ -57,6 +60,7 @@ type Agent struct {
 	// Communication methods
 	beaconContact contact.Contact
 	heartbeatContact contact.Contact
+	failedBeaconCounter int
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -92,6 +96,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
 	a.initialDelay = float64(initialDelay)
+	a.failedBeaconCounter = 0
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
@@ -182,6 +187,19 @@ func processBeacon(data []byte) map[string]interface{} {
 		}
 	}
 	return beacon
+}
+
+// If too many consecutive failures occur for the current communication method, switch to a new proxy method.
+// Return an error if switch fails.
+func (a *Agent) HandleBeaconFailure() error {
+	a.failedBeaconCounter += 1
+	if a.failedBeaconCounter >= beaconFailureThreshold {
+		// Reset counter and try switching proxy methods
+		a.failedBeaconCounter = 0
+		output.VerbosePrint("[!] Reached beacon failure threshold. Attempting to switch to new peer proxy method.")
+		return a.findAvailablePeerProxyClient()
+	}
+	return nil
 }
 
 func (a *Agent) Heartbeat() {
