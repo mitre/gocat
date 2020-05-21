@@ -64,6 +64,8 @@ type Agent struct {
 	localP2pReceivers map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
 	localP2pReceiverAddresses map[string][]string // maps P2P protocol to receiver addresses listening on this machine
 	availablePeerReceivers map[string][]string // maps P2P protocol to receiver addresses running on peer machines
+	exhaustedPeerReceivers map[string][]string // maps P2P protocol to receiver addresses that the agent has tried using.
+	usingPeerReceivers bool // True if connecting to C2 via proxy peer
 }
 
 // Set up agent variables.
@@ -89,29 +91,33 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.executors = execute.AvailableExecutors()
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
-	a.enableLocalP2pReceivers = enableLocalP2pReceivers
 	a.initialDelay = float64(initialDelay)
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
 		a.paw = paw
 	}
+
+	// Load peer proxy receiver information
+	a.exhaustedPeerReceivers = make(map[string][]string)
+	a.usingPeerReceivers = false
+	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
+	if err != nil {
+		return err
+	}
+
 	// Set up contacts
 	if err = a.SetCommunicationChannels(c2Config); err != nil {
 		return err
 	}
 
 	// Set up P2P receivers.
+	a.enableLocalP2pReceivers = enableLocalP2pReceivers
 	if a.enableLocalP2pReceivers {
 		a.localP2pReceivers = make(map[string]proxy.P2pReceiver)
 		a.localP2pReceiverAddresses = make(map[string][]string)
 		a.p2pReceiverWaitGroup = &sync.WaitGroup{}
 		a.ActivateLocalP2pReceivers()
-	}
-
-	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
-	if err != nil {
-		return err
 	}
 	return nil
 }
@@ -214,6 +220,9 @@ func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]strin
 				return nil
 			}
 		}
+		// Original requested channel not found. See if we can use any available peer-to-peer-proxy receivers.
+		output.VerbosePrint("[!] Requested communication channel not valid or available. Resorting to peer-to-peer.")
+		return a.findAvailablePeerProxyClient()
 	}
 	return errors.New("No possible C2 communication channels found.")
 }
@@ -249,7 +258,6 @@ func (a *Agent) Display() {
 	if a.enableLocalP2pReceivers {
 		a.displayLocalReceiverInformation()
 	}
-	a.displayPeerReceiverInformation()
 }
 
 func (a *Agent) displayLocalReceiverInformation() {
@@ -263,14 +271,6 @@ func (a *Agent) displayLocalReceiverInformation() {
 	for protocol, addressList := range a.localP2pReceiverAddresses {
 		for _, address := range addressList {
 			output.VerbosePrint(fmt.Sprintf("%s local proxy receiver available at %s", protocol, address))
-		}
-	}
-}
-
-func (a *Agent) displayPeerReceiverInformation() {
-	for protocol, addressList := range a.availablePeerReceivers {
-		for _, address := range addressList {
-			output.VerbosePrint(fmt.Sprintf("%s peer proxy receiver available at %s", protocol, address))
 		}
 	}
 }
