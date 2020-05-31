@@ -48,27 +48,32 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]
 		req, err := http.NewRequest("POST", address, nil)
 		if err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Failed to create HTTP request: %s", err.Error()))
-		} else {
-			req.Header.Set("file", payload)
-			req.Header.Set("platform", platform.(string))
-			client := &http.Client{}
-			resp, err := client.Do(req)
-			if err == nil && resp.StatusCode == ok {
-				buf, err := ioutil.ReadAll(resp.Body)
-				if err == nil {
-					payloadBytes = buf
-					if name_header, ok := resp.Header["Filename"]; ok {
-						filename = filepath.Join(name_header[0])
-					} else {
-						output.VerbosePrint("[-] HTTP response missing Filename header.")
-					}
-				} else {
-					output.VerbosePrint(fmt.Sprintf("[-] Error reading HTTP response: %s", err.Error()))
-				}
+			return nil, ""
+		}
+		req.Header.Set("file", payload)
+		req.Header.Set("platform", platform.(string))
+		req.Header.Set("paw", profile["paw"].(string))
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Error sending payload request: %s", err.Error()))
+			return nil, ""
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode == ok {
+			buf, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				output.VerbosePrint(fmt.Sprintf("[-] Error reading HTTP response: %s", err.Error()))
+				return nil, ""
+			}
+			payloadBytes = buf
+			if name_header, ok := resp.Header["Filename"]; ok {
+				filename = filepath.Join(name_header[0])
+			} else {
+				output.VerbosePrint("[-] HTTP response missing Filename header.")
 			}
 		}
     }
-
 	return payloadBytes, filename
 }
 
