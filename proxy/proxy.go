@@ -22,6 +22,7 @@ type P2pReceiver interface {
 	RunReceiver() // must be run as a go routine
 	UpdateUpstreamServer(newServer string)
 	UpdateUpstreamComs(newComs contact.Contact)
+	UpdateAgentPaw(newPaw string)
 	Terminate()
 	GetReceiverAddresses() []string
 }

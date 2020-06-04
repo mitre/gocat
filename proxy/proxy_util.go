@@ -55,3 +55,21 @@ func GetAvailablePeerReceivers() (map[string][]string, error) {
 	}
 	return peerReceiverInfo, nil
 }
+
+// Given the client profile, append the forwarder's paw, receiver address, and peer protocol to the peer proxy
+// chain information in the profile to update the peer-to-peer hops. Modifies the given client profile.
+func updatePeerChain(clientProfile map[string]interface{}, forwarderPaw string, receiverAddr string, peerProtocol string) {
+	// Proxy chain must be a list of length-3 lists ([forwarder paw, receiver address, peer protocol])
+	var proxyChain []interface{}
+	if _, ok := clientProfile["proxy_chain"]; ok {
+		proxyChain = clientProfile["proxy_chain"].([]interface{})
+	} else {
+		proxyChain = make([]interface{}, 0)
+	}
+	nextHop := make([]string, 3)
+	nextHop[0] = forwarderPaw
+	nextHop[1] = receiverAddr
+	nextHop[2] = peerProtocol
+	proxyChain = append(proxyChain, nextHop)
+	clientProfile["proxy_chain"] = proxyChain
+}

@@ -31,6 +31,7 @@ type AgentInterface interface {
 	GetFullProfile() map[string]interface{}
 	GetTrimmedProfile() map[string]interface{}
 	SetCommunicationChannels(c2Config map[string]string) error
+	SetPaw(paw string)
 	Display()
 	DownloadPayloads(payloads []interface{}) []string
 	FetchPayloadBytes(payload string) []byte
@@ -342,6 +343,11 @@ func (a *Agent) GetPaw() string {
 func (a *Agent) SetPaw(paw string) {
 	if len(paw) > 0 {
 		a.paw = paw
+		if a.enableLocalP2pReceivers {
+			for _, receiver := range a.localP2pReceivers {
+				receiver.UpdateAgentPaw(paw)
+			}
+		}
 	}
 }
 
@@ -355,7 +361,7 @@ func (a *Agent) GetHeartbeatContact() contact.Contact {
 
 func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 	if val, ok := config["paw"]; ok {
-		a.paw = val
+		a.SetPaw(val)
 	}
 }
 
