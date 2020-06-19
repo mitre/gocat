@@ -1,11 +1,9 @@
 package agent
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -75,7 +73,6 @@ type Agent struct {
 
 // Set up agent variables.
 func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string) error {
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	host, err := os.Hostname()
 	if err != nil {
 		return err
