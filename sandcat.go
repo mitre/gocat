@@ -19,6 +19,7 @@ var (
 	c2Name    = "HTTP"
 	c2Key     = ""
 	listenP2P = "false" // need to set as string to allow ldflags -X build-time variable change on server-side.
+	httpProxyGateway = ""
 )
 
 func main() {
@@ -27,6 +28,7 @@ func main() {
 		parsedListenP2P = false
 	}
 	server := flag.String("server", server, "The FQDN of the server")
+	httpProxyUrl :=  flag.String("httpProxyGateway", httpProxyGateway, "URL for the HTTP proxy gateway. For environments that use proxies to reach the internet.")
 	paw := flag.String("paw", paw, "Optionally specify a PAW on intialization")
 	group := flag.String("group", group, "Attach a group to this agent")
 	c2 := flag.String("c2", c2Name, "C2 Channel for agent")
@@ -36,6 +38,6 @@ func main() {
 
 	flag.Parse()
 
-	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key}
+	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
 	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose, *paw)
 }

@@ -15,7 +15,7 @@ import (
 )
 
 // Initializes and returns sandcat agent.
-func initializeCore(server string, group string,c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool, paw string) (*agent.Agent, error) {
+func initializeCore(server string, group string, c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool, paw string) (*agent.Agent, error) {
 	output.SetVerbose(verbose)
 	output.VerbosePrint("Starting sandcat in verbose mode.")
 	return agent.AgentFactory(server, group, c2, p2pReceiversOn, initialDelay, paw)
