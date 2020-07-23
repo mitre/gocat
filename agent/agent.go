@@ -217,6 +217,12 @@ func (a *Agent) RunInstruction(command map[string]interface{}, payloads []string
 	timeout := int(command["timeout"].(float64))
 	result := make(map[string]interface{})
 	commandOutput, status, pid := execute.RunCommand(command["command"].(string), payloads, command["executor"].(string), timeout)
+	for _, payloadPath := range payloads {
+		err = os.Remove(payloadPath)
+		if err {
+			output.VerbosePrint("[!] Failed to delete payload: " + payloadPath)
+		}
+	}
 	result["id"] = command["id"]
 	result["output"] = commandOutput
 	result["status"] = status
