@@ -228,7 +228,7 @@ func (a *Agent) cleanupExecutable() {
 		return
 	}
 	if platform == "darwin" || platform == "linux" {
-		cmd = exec.Command("bash", "-c", fmt.Sprintf("sleep 5 && /bin/rm %s", location))
+		cmd = exec.Command("bash", "-c", fmt.Sprintf("sleep 5 && /bin/rm -f %s", location))
 	} else if platform == "windows" {
 		cmd = exec.Command("cmd.exe", "/c", fmt.Sprintf("timeout /nobreak /t 5 >nul 2>nul & del /f %s", location))
 	}
