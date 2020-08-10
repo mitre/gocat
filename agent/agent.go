@@ -219,6 +219,7 @@ func (a *Agent) Terminate() {
 }
 
 // Helper function for Terminate routine.
+// Will remove the sandcat executable if no other agent processes are using it.
 func (a *Agent) cleanupExecutable() {
 	var cmd *exec.Cmd = nil
 	platform := runtime.GOOS
@@ -228,9 +229,15 @@ func (a *Agent) cleanupExecutable() {
 		return
 	}
 	if platform == "darwin" || platform == "linux" {
-		cmd = exec.Command("bash", "-c", fmt.Sprintf("sleep 5 && /bin/rm -f %s", location))
+		// Check if other processes are using the sandcat executable before deleting it.
+		innerCommand := "sleep 10; " +
+						fmt.Sprintf("if [[ -z $(for id in $(pgrep -f %s); ", a.exe_name) +
+						fmt.Sprintf("do lsof -p $id 2> /dev/null | grep %s; done) ]]; ", location) +
+						fmt.Sprintf("then /bin/rm -f %s; fi;", location)
+		cmd = exec.Command("bash", "-c", innerCommand)
 	} else if platform == "windows" {
-		cmd = exec.Command("cmd.exe", "/c", fmt.Sprintf("timeout /nobreak /t 5 >nul 2>nul & del /f %s", location))
+		innerCommand := fmt.Sprintf("timeout /nobreak /t 10 >nul 2>nul & del /f %s", location)
+		cmd = exec.Command("cmd.exe", "/c", innerCommand)
 	}
 	if cmd != nil {
 		if err = cmd.Start(); err != nil {
