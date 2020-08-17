@@ -7,7 +7,7 @@ func AgentFactory(server string, group string, c2Config map[string]string, enabl
 	if err := newAgent.Initialize(server, group, c2Config, enableLocalP2pReceivers, initialDelay, paw); err != nil {
 		return nil, err
 	} else {
-		newAgent.Sleep(newAgent.initialDelay)
+		newAgent.Sleep(newAgent.initialDelay, false)
 		return newAgent, nil
 	}
 }

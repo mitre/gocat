@@ -42,15 +42,6 @@ func (a *Agent) storeLocalP2pReceiverAddresses(receiverName string, p2pReceiver 
 // Attempts to look for any compatible peer-to-peer proxy clients for available proxy receivers.
 // Sets the first valid one it can find. Returns an error if no valid proxy clients are found.
 func (a *Agent) findAvailablePeerProxyClient() error {
-	if len(a.availablePeerReceivers) == 0 {
-		// Either we used all available peers, or we simply never had any to start with. Refresh
-		// the used peers if possible.
-		if len(a.exhaustedPeerReceivers) == 0 {
-			return errors.New("No peer proxy receivers available to connect to.")
-		}
-		output.VerbosePrint("[*] All available peer proxy receivers have been tried. Retrying them.")
-		a.refreshAvailablePeerReceivers()
-	}
 	for proxyChannel, receiverAddresses := range a.availablePeerReceivers {
 		if len(receiverAddresses) > 0 {
 			output.VerbosePrint(fmt.Sprintf("[-] Verifying proxy channel %s", proxyChannel))
