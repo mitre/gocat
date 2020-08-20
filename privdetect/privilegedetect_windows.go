@@ -62,7 +62,7 @@ func IsElevated(token syscall.Token) bool {
 	var outLen uint32
 	err := syscall.GetTokenInformation(token, TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
 	if err != nil {
-		output.VerbosePrint(fmt.Sprintf("Error getting token info: %s", err.Error()))
+		output.VerbosePrint(fmt.Sprintf("Error getting process token info: %s", err.Error()))
 		return false
 	}
 	return outLen == uint32(unsafe.Sizeof(isElevated)) && isElevated != 0
@@ -72,11 +72,8 @@ func Privlevel() string{
     token, err := syscall.OpenCurrentProcessToken()
     if err != nil {
     	output.VerbosePrint(fmt.Sprintf("Error opening current process token: %s", err.Error()))
-    	return "User"
-    }
-    if IsElevated(token) ==true {
+    } else if IsElevated(token) {
     	return "Elevated"
-    } else {
-    	return "User"
     }
+    return "User"
 }
