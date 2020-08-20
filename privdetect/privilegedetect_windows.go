@@ -1,8 +1,11 @@
+// +build windows
 package privdetect
 
 import (
     "syscall"
     "unsafe"
+    "fmt"
+    "github.com/mitre/gocat/output"
 )
 type Token uintptr
 
@@ -41,8 +44,6 @@ const (
 )
 
 var (
-	modAdvapi32 = syscall.NewLazyDLL("Advapi32.dll")
-	procGetTokenInformation = modAdvapi32.NewProc("GetTokenInformation")
 	errERROR_IO_PENDING error = syscall.Errno(errnoERROR_IO_PENDING)
 )
 
@@ -56,31 +57,24 @@ func errnoErr(e syscall.Errno) error {
 	return e
 }
 
-func GetTokenInformation(token Token, infoClass uint32, info *byte, infoLen uint32, returnedLen *uint32) (err error) {
-	r1, _, e1 := syscall.Syscall6(procGetTokenInformation.Addr(), 5, uintptr(token), uintptr(infoClass), uintptr(unsafe.Pointer(info)), uintptr(infoLen), uintptr(unsafe.Pointer(returnedLen)), 0)
-	if r1 == 0 {
-		if e1 != 0 {
-			err = errnoErr(e1)
-		} else {
-			err = syscall.EINVAL
-		}
-	}
-	return
-}
-
-func (token Token) IsElevated() bool {
+func IsElevated(token syscall.Token) bool {
 	var isElevated uint32
 	var outLen uint32
-	err := GetTokenInformation(token, TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
+	err := syscall.GetTokenInformation(token, TokenElevation, (*byte)(unsafe.Pointer(&isElevated)), uint32(unsafe.Sizeof(isElevated)), &outLen)
 	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("Error getting token info: %s", err.Error()))
 		return false
 	}
 	return outLen == uint32(unsafe.Sizeof(isElevated)) && isElevated != 0
 }
 
 func Privlevel() string{
-    token := Token(^uintptr(4 - 1))
-    if token.IsElevated() ==true {
+    token, err := syscall.OpenCurrentProcessToken()
+    if err != nil {
+    	output.VerbosePrint(fmt.Sprintf("Error opening current process token: %s", err.Error()))
+    	return "User"
+    }
+    if IsElevated(token) ==true {
     	return "Elevated"
     } else {
     	return "User"
