@@ -60,7 +60,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 					output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))
 					droppedPayloads := sandcatAgent.DownloadPayloads(command["payloads"].([]interface{}))
 					go sandcatAgent.RunInstruction(command, droppedPayloads)
-					sandcatAgent.Sleep(command["sleep"].(float64))
+					sandcatAgent.Sleep(command["sleep"].(float64), true)
 				}
 			}
 		} else {
@@ -68,15 +68,14 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 			if len(beacon) > 0 {
 				sleepDuration = float64(beacon["sleep"].(int))
 				watchdog = beacon["watchdog"].(int)
+				sandcatAgent.Sleep(sleepDuration, true)
 			} else {
 				// Failed beacon
 				if err := sandcatAgent.HandleBeaconFailure(); err != nil {
 					output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
 					return
 				}
-				sleepDuration = float64(15)
 			}
-			sandcatAgent.Sleep(sleepDuration)
 		}
 	}
 }
