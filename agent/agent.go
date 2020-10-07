@@ -61,8 +61,8 @@ type Agent struct {
 	beaconContact contact.Contact
 	heartbeatContact contact.Contact
 	failedBeaconCounter int
-	firstSuccessFulServer string // first server that agent was able to successfully connect to.
-	firstSuccessFulComs contact.Contact // first Contact implementation that the agent used to successfully reach C2
+	firstSuccessfulServer string // first server that agent was able to successfully connect to.
+	firstSuccessfulContact contact.Contact // first Contact implementation that the agent used to successfully reach C2
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -86,8 +86,8 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 		return err
 	}
 	a.server = server
-	a.firstSuccessFulServer = ""
-	a.firstSuccessFulComs = nil
+	a.firstSuccessfulServer = ""
+	a.firstSuccessfulContact = nil
 	a.group = group
 	a.host = host
 	a.architecture = runtime.GOARCH
@@ -167,10 +167,10 @@ func (a *Agent) Beacon() map[string]interface{} {
 	profile := a.GetFullProfile()
 	response := a.beaconContact.GetBeaconBytes(profile)
 	if response != nil {
-		if len(a.firstSuccessFulServer) == 0 {
+		if len(a.firstSuccessfulServer) == 0 {
 			// Mark server and comms for first successful contact.
-			a.firstSuccessFulServer = a.server
-			a.firstSuccessFulComs = a.beaconContact
+			a.firstSuccessfulServer = a.server
+			a.firstSuccessfulContact = a.beaconContact
 		}
 		beacon = processBeacon(response)
 	} else {
@@ -223,7 +223,7 @@ func (a *Agent) HandleBeaconFailure() error {
 			output.VerbosePrint("[!] No more available peer proxy receivers.")
 
 			// No more available receivers. If we haven't reached the C2 before, error out.
-			if len(a.firstSuccessFulServer) == 0 {
+			if len(a.firstSuccessfulServer) == 0 {
 				return errors.New("Reached failure threshold for initial C2 communications. No available proxy receivers.")
 			}
 
@@ -235,7 +235,7 @@ func (a *Agent) HandleBeaconFailure() error {
 
 			// We've iterated through all available proxy receivers, or there were none to begin with.
 			// Fallback to first successful server & comms
-			a.fallbackToFirstSuccessFulServer()
+			a.fallbackToFirstSuccessfulServer()
 			return nil
 		}
 		// We still have peer receivers to try out. Sleep and keep going.
@@ -246,10 +246,10 @@ func (a *Agent) HandleBeaconFailure() error {
 
 // Helper method for HandleBeaconFailure.
 // Will sleep extra before trying C2 access again using first successful server/comms.
-func (a *Agent) fallbackToFirstSuccessFulServer() {
+func (a *Agent) fallbackToFirstSuccessfulServer() {
 	extraSleepTime := a.normalSleepTime * 2
-	a.updateUpstreamServer(a.firstSuccessFulServer)
-	a.updateUpstreamComs(a.firstSuccessFulComs)
+	a.updateUpstreamServer(a.firstSuccessfulServer)
+	a.updateUpstreamComs(a.firstSuccessfulContact)
 	output.VerbosePrint(fmt.Sprintf("[*] Falling back to first successful server address %s after sleeping for %d seconds.", a.server, int(extraSleepTime)))
 	a.Sleep(extraSleepTime, false)
 }
