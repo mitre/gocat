@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -207,47 +206,10 @@ func (a *Agent) Heartbeat() {
 
 func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
-	output.VerbosePrint("[*] Beginning sandcat agent termination process")
+	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
 	if a.enableLocalP2pReceivers {
 		a.TerminateLocalP2pReceivers()
 	}
-
-	// Start delayed routine to remove sandcat executable after agent termination.
-	// Make sure this is run last!
-	a.cleanupExecutable()
-	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
-}
-
-// Helper function for Terminate routine.
-// Will remove the sandcat executable if no other agent processes are using it.
-func (a *Agent) cleanupExecutable() {
-	var cmd *exec.Cmd = nil
-	platform := runtime.GOOS
-	location, err := os.Executable()
-	if err != nil {
-		output.VerbosePrint("[!] Error obtaining sandcat executable file location. Cannot remove executable.")
-		return
-	}
-	if platform == "darwin" || platform == "linux" {
-		// Check if other processes are using the sandcat executable before deleting it.
-		innerCommand := "sleep 10; " +
-						fmt.Sprintf("if [[ -z $(for id in $(pgrep -f %s); ", a.exe_name) +
-						fmt.Sprintf("do lsof -p $id 2> /dev/null | grep %s; done) ]]; ", location) +
-						fmt.Sprintf("then /bin/rm -f %s; fi;", location)
-		cmd = exec.Command("bash", "-c", innerCommand)
-	} else if platform == "windows" {
-		innerCommand := fmt.Sprintf("timeout /nobreak /t 10 >nul 2>nul & del /f %s", location)
-		cmd = exec.Command("cmd.exe", "/c", innerCommand)
-	}
-	if cmd != nil {
-		if err = cmd.Start(); err != nil {
-			output.VerbosePrint("[!] Unable to start routine to remove sandcat executable.")
-			return
-		}
-		output.VerbosePrint("[*] Started delayed routine to remove sandcat executable.")
-		return
-	}
-	output.VerbosePrint(fmt.Sprintf("[!] Unable to generate executable cleanup command for platform %s.", platform))
 }
 
 // Runs a single instruction and send results.
