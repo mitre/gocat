@@ -216,8 +216,8 @@ func (a *Agent) Terminate() {
 func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string) {
 	result := make(map[string]interface{})
 	info := execute.InstructionInfo{
-	    Profile: a.GetTrimmedProfile(),
-	    Instruction: instruction,
+		Profile: a.GetTrimmedProfile(),
+		Instruction: instruction,
 	}
 	commandOutput, status, pid := execute.RunCommand(info, payloads)
 	for _, payloadPath := range payloads {

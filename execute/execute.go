@@ -25,8 +25,8 @@ type Executor interface {
 }
 
 type InstructionInfo struct {
-    Profile map[string]interface{}
-    Instruction map[string]interface{}
+	Profile map[string]interface{}
+	Instruction map[string]interface{}
 }
 
 func AvailableExecutors() (values []string) {
@@ -41,8 +41,8 @@ var Executors = map[string]Executor{}
 //RunCommand runs the actual command
 func RunCommand(info InstructionInfo, payloads []string) ([]byte, string, string) {
 	encodedCommand := info.Instruction["command"].(string)
-    executor := info.Instruction["executor"].(string)
-    timeout := int(info.Instruction["timeout"].(float64))
+	executor := info.Instruction["executor"].(string)
+	timeout := int(info.Instruction["timeout"].(float64))
 	var status string
 	var result []byte
 	var pid string
