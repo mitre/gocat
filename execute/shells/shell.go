@@ -20,7 +20,7 @@ func init() {
 	}
 }
 
-func (s *Sh) Run(command string, timeout int) ([]byte, string, string) {
+func (s *Sh) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string) {
 	return runShellExecutor(*exec.Command(s.path, append(s.execArgs, command)...), timeout)
 }
 
