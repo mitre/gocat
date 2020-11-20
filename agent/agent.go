@@ -55,6 +55,7 @@ type Agent struct {
 	exe_name string
 	paw string
 	initialDelay float64
+	originLinkID int
 
 	// Communication methods
 	beaconContact contact.Contact
@@ -72,7 +73,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string) error {
+func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID int) error {
 	host, err := os.Hostname()
 	if err != nil {
 		return err
@@ -95,6 +96,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.exe_name = filepath.Base(os.Args[0])
 	a.initialDelay = float64(initialDelay)
 	a.failedBeaconCounter = 0
+	a.originLinkID = originLinkID
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
@@ -142,6 +144,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"privilege": a.privilege,
 		"exe_name": a.exe_name,
 		"proxy_receivers": a.localP2pReceiverAddresses,
+		"origin_link_id": a.originLinkID,
 	}
 }
 
