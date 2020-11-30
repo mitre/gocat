@@ -10,12 +10,15 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"context"
+	"strings"
 
 	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
 	"github.com/mitre/gocat/proxy"
+	"github.com/grandcat/zeroconf"
 )
 
 var beaconFailureThreshold = 3
@@ -36,6 +39,7 @@ type AgentInterface interface {
 	ActivateLocalP2pReceivers()
 	TerminateLocalP2pReceivers()
 	HandleBeaconFailure() error
+	DiscoverPeers()
 }
 
 // Implements AgentInterface
@@ -386,3 +390,44 @@ func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
 		}
 	}
 }
+
+func (a *Agent) evaluateNewPeers(results <- chan *zeroconf.ServiceEntry) {
+    for entry := range results {
+        for _, ip := range entry.AddrIPv4 {
+            a.mergeNewPeers(entry.Text[0], fmt.Sprintf("%s:%d", ip, entry.Port))
+        }
+    }
+}
+
+func (a *Agent) mergeNewPeers(proxyChannel string, ipPort string) {
+    peer := fmt.Sprintf("%s://%s", strings.ToLower(proxyChannel), ipPort)
+    allPeers := append(a.availablePeerReceivers[proxyChannel], a.exhaustedPeerReceivers[proxyChannel]...)
+    for _, existingPeer := range allPeers {
+        if peer == existingPeer {
+            return
+        }
+    }
+    a.availablePeerReceivers[proxyChannel] = append(a.availablePeerReceivers[proxyChannel], peer)
+    output.VerbosePrint(fmt.Sprintf("new peer added: %s", peer))
+}
+
+func (a *Agent) DiscoverPeers() {
+    // Discover all services on the network (e.g. _workstation._tcp)
+    resolver, err := zeroconf.NewResolver(nil)
+    if err != nil {
+        output.VerbosePrint(fmt.Sprintf("Failed to initialize zeroconf resolver: %s", err.Error()))
+    }
+
+    entries := make(chan *zeroconf.ServiceEntry)
+    go a.evaluateNewPeers(entries)
+
+    ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+    defer cancel()
+    err = resolver.Browse(ctx, "_service._comms", "local.", entries)
+    if err != nil {
+         output.VerbosePrint(fmt.Sprintf("Failed to browse for peers: %s", err.Error()))
+    }
+
+    <-ctx.Done()
+}
+

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+	"math/rand"
 
 	"github.com/mitre/gocat/agent"
 	"github.com/mitre/gocat/output"
@@ -39,6 +40,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 	// Start main execution loop.
 	watchdog := 0
 	checkin := time.Now()
+	lastDiscovery := time.Now()
 	for (evaluateWatchdog(checkin, watchdog)) {
 		// Send beacon and get response.
 		beacon := sandcatAgent.Beacon()
@@ -78,10 +80,25 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 			}
 			sandcatAgent.Sleep(sleepDuration)
 		}
+		// randomly check for dynamically discoverable peer agents on the network
+		if findPeers(lastDiscovery, sandcatAgent) {
+		    lastDiscovery = time.Now()
+		}
 	}
 }
 
 // Returns true if agent should keep running, false if not.
 func evaluateWatchdog(lastcheckin time.Time, watchdog int) bool {
 	return watchdog <= 0 || float64(time.Now().Sub(lastcheckin).Seconds()) <= float64(watchdog)
+}
+
+func findPeers(last time.Time, sandcatAgent *agent.Agent) bool {
+    minDiscoveryInterval := 300
+    diff := float64(time.Now().Sub(last).Seconds())
+    if diff >= float64(rand.Intn(120) + minDiscoveryInterval) {
+        sandcatAgent.DiscoverPeers()
+        return true
+    } else {
+        return false
+    }
 }
