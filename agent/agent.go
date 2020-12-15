@@ -213,17 +213,20 @@ func (a *Agent) Terminate() {
 }
 
 // Runs a single instruction and send results.
-func (a *Agent) RunInstruction(command map[string]interface{}, payloads []string) {
-	timeout := int(command["timeout"].(float64))
+func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string) {
 	result := make(map[string]interface{})
-	commandOutput, status, pid := execute.RunCommand(command["command"].(string), payloads, command["executor"].(string), timeout)
+	info := execute.InstructionInfo{
+		Profile: a.GetTrimmedProfile(),
+		Instruction: instruction,
+	}
+	commandOutput, status, pid := execute.RunCommand(info, payloads)
 	for _, payloadPath := range payloads {
 		err := os.Remove(payloadPath)
 		if err != nil {
 			output.VerbosePrint("[!] Failed to delete payload: " + payloadPath)
 		}
 	}
-	result["id"] = command["id"]
+	result["id"] = instruction["id"]
 	result["output"] = commandOutput
 	result["status"] = status
 	result["pid"] = pid

