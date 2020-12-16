@@ -112,6 +112,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	if err != nil {
 		return err
 	}
+	a.DiscoverPeers()
 
 	// Set up contacts
 	if err = a.SetCommunicationChannels(c2Config); err != nil {
@@ -407,15 +408,24 @@ func (a *Agent) mergeNewPeers(proxyChannel string, ipPort string) {
             return
         }
     }
+    for protocol, addressList := range a.localP2pReceiverAddresses {
+        if proxyChannel == protocol {
+            for _, address := range addressList {
+                if peer == address {
+                    return
+                }
+            }
+		}
+	}
     a.availablePeerReceivers[proxyChannel] = append(a.availablePeerReceivers[proxyChannel], peer)
-    output.VerbosePrint(fmt.Sprintf("new peer added: %s", peer))
+    output.VerbosePrint(fmt.Sprintf("[*] new peer added: %s", peer))
 }
 
 func (a *Agent) DiscoverPeers() {
     // Discover all services on the network (e.g. _workstation._tcp)
     resolver, err := zeroconf.NewResolver(nil)
     if err != nil {
-        output.VerbosePrint(fmt.Sprintf("Failed to initialize zeroconf resolver: %s", err.Error()))
+        output.VerbosePrint(fmt.Sprintf("[-] Failed to initialize zeroconf resolver: %s", err.Error()))
     }
 
     entries := make(chan *zeroconf.ServiceEntry)
@@ -425,7 +435,7 @@ func (a *Agent) DiscoverPeers() {
     defer cancel()
     err = resolver.Browse(ctx, "_service._comms", "local.", entries)
     if err != nil {
-         output.VerbosePrint(fmt.Sprintf("Failed to browse for peers: %s", err.Error()))
+         output.VerbosePrint(fmt.Sprintf("[-] Failed to browse for peers: %s", err.Error()))
     }
 
     <-ctx.Done()
