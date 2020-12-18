@@ -24,7 +24,7 @@ type AgentInterface interface {
 	Heartbeat()
 	Beacon() map[string]interface{}
 	Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool) error
-	RunInstruction(command map[string]interface{}, payloads []string)
+	RunInstruction(command map[string]interface{}, payloads []string, submitResults bool)
 	Terminate()
 	GetFullProfile() map[string]interface{}
 	GetTrimmedProfile() map[string]interface{}
@@ -70,6 +70,9 @@ type Agent struct {
 	availablePeerReceivers map[string][]string // maps P2P protocol to receiver addresses running on peer machines
 	exhaustedPeerReceivers map[string][]string // maps P2P protocol to receiver addresses that the agent has tried using.
 	usingPeerReceivers bool // True if connecting to C2 via proxy peer
+
+	// Deadman instructions to run before termination. Will be list of instruction mappings.
+	deadmanInstructions []map[string]interface{}
 }
 
 // Set up agent variables.
@@ -145,6 +148,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"exe_name": a.exe_name,
 		"proxy_receivers": a.localP2pReceiverAddresses,
 		"origin_link_id": a.originLinkID,
+		"deadman_enabled": true,
 	}
 }
 
@@ -209,14 +213,18 @@ func (a *Agent) Heartbeat() {
 
 func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
-	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
+	output.VerbosePrint("[*] Beginning agent termination.")
 	if a.enableLocalP2pReceivers {
 		a.TerminateLocalP2pReceivers()
 	}
+
+	// Run deadman instructions prior to termination
+	a.ExecuteDeadmanInstructions()
+	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
 }
 
 // Runs a single instruction and send results.
-func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string) {
+func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string, submitResults bool) {
 	result := make(map[string]interface{})
 	info := execute.InstructionInfo{
 		Profile: a.GetTrimmedProfile(),
@@ -229,11 +237,13 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 			output.VerbosePrint("[!] Failed to delete payload: " + payloadPath)
 		}
 	}
-	result["id"] = instruction["id"]
-	result["output"] = commandOutput
-	result["status"] = status
-	result["pid"] = pid
- 	a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+	if submitResults {
+		result["id"] = instruction["id"]
+		result["output"] = commandOutput
+		result["status"] = status
+		result["pid"] = pid
+		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+	}
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
@@ -366,6 +376,18 @@ func (a *Agent) GetBeaconContact() contact.Contact {
 
 func (a *Agent) GetHeartbeatContact() contact.Contact {
 	return a.heartbeatContact
+}
+
+func (a *Agent) StoreDeadmanInstruction(instruction map[string]interface{}) {
+	a.deadmanInstructions = append(a.deadmanInstructions, instruction)
+}
+
+func (a *Agent) ExecuteDeadmanInstructions() {
+	for _, instruction := range a.deadmanInstructions {
+		output.VerbosePrint(fmt.Sprintf("[*] Running deadman instruction %s", instruction["id"]))
+		droppedPayloads := a.DownloadPayloads(instruction["payloads"].([]interface{}))
+		a.RunInstruction(instruction, droppedPayloads, false)
+	}
 }
 
 func (a *Agent) modifyAgentConfiguration(config map[string]string) {
