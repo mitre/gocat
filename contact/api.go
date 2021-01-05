@@ -45,7 +45,7 @@ func (a *API) GetBeaconBytes(profile map[string]interface{}) []byte {
 }
 
 // Return the file bytes for the requested payload.
-func (a *API) GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string) {
+func (a *API) GetPayloadBytes(profile map[string]interface{}, payload string, link_id string) ([]byte, string) {
     var payloadBytes []byte
     var filename string
     server := profile["server"]
@@ -60,6 +60,7 @@ func (a *API) GetPayloadBytes(profile map[string]interface{}, payload string) ([
 		req.Header.Set("file", payload)
 		req.Header.Set("platform", platform.(string))
 		req.Header.Set("paw", profile["paw"].(string))
+		req.Header.Set("link", link_id)
 		resp, err := a.client.Do(req)
 		if err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Error sending payload request: %s", err.Error()))

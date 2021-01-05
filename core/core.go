@@ -71,13 +71,14 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 				if err := json.Unmarshal([]byte(marshaledInstruction), &instruction); err != nil {
 					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
 				} else {
+					link_id := instruction["id"].(string)
 					// If instruction is deadman, save it for later. Otherwise, run the instruction.
 					if (instruction["deadman"].(bool)) {
-						output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", instruction["id"]))
+						output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", link_id))
 						sandcatAgent.StoreDeadmanInstruction(instruction)
 					} else {
-						output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
-						droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
+						output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", link_id))
+						droppedPayloads := sandcatAgent.DownloadInstructionPayloads(instruction)
 						go sandcatAgent.RunInstruction(instruction, droppedPayloads, true)
 						sandcatAgent.Sleep(instruction["sleep"].(float64))
 					}

