@@ -35,9 +35,10 @@ func main() {
 	delay := flag.Int("delay", 0, "Delay starting this agent by n-seconds")
 	verbose := flag.Bool("v", false, "Enable verbose output")
 	listenP2P := flag.Bool("listenP2P", parsedListenP2P, "Enable peer-to-peer receivers")
+	originLinkID := flag.Int("originLinkID", 0, "Optionally set originating link ID")
 
 	flag.Parse()
 
 	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
-	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose, *paw)
+	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose, *paw, *originLinkID)
 }
