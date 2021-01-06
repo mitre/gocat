@@ -57,7 +57,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 				if err := json.Unmarshal([]byte(marshaledInstruction), &instruction); err != nil {
 					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
 				} else {
-					// I instruction is deadman, save it for later. Otherwise, run the instruction.
+					// If instruction is deadman, save it for later. Otherwise, run the instruction.
 					if (instruction["deadman"].(bool)) {
 						output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", instruction["id"]))
 						sandcatAgent.StoreDeadmanInstruction(instruction)
