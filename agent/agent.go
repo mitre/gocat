@@ -40,6 +40,8 @@ type AgentInterface interface {
 	TerminateLocalP2pReceivers()
 	HandleBeaconFailure() error
 	DiscoverPeers()
+	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
+	GetCurrentContactName() string
 }
 
 // Implements AgentInterface
@@ -142,6 +144,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"server": a.server,
 		"group": a.group,
 		"host": a.host,
+		"contact": a.beaconContact.GetName(),
 		"username": a.username,
 		"architecture": a.architecture,
 		"platform": a.platform,
@@ -154,6 +157,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"proxy_receivers": a.localP2pReceiverAddresses,
 		"origin_link_id": a.originLinkID,
 		"deadman_enabled": true,
+		"available_contacts": contact.GetAvailableCommChannels(),
 	}
 }
 
@@ -164,6 +168,7 @@ func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 		"server": a.server,
 		"platform": a.platform,
 		"host": a.host,
+		"contact": a.beaconContact.GetName(),
 	}
 }
 
@@ -173,7 +178,7 @@ func (a *Agent) Beacon() map[string]interface{} {
 	profile := a.GetFullProfile()
 	response := a.beaconContact.GetBeaconBytes(profile)
 	if response != nil {
-		beacon = processBeacon(response)
+		beacon = a.processBeacon(response)
 	} else {
 		output.VerbosePrint("[-] beacon: DEAD")
 	}
@@ -181,7 +186,7 @@ func (a *Agent) Beacon() map[string]interface{} {
 }
 
 // Converts the given data into a beacon with instructions.
-func processBeacon(data []byte) map[string]interface{} {
+func (a *Agent) processBeacon(data []byte) map[string]interface{} {
 	var beacon map[string]interface{}
 	if err := json.Unmarshal(data, &beacon); err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Malformed beacon received: %s", err.Error()))
@@ -190,7 +195,7 @@ func processBeacon(data []byte) map[string]interface{} {
 		if err := json.Unmarshal([]byte(beacon["instructions"].(string)), &commands); err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Malformed beacon instructions received: %s", err.Error()))
 		} else {
-			output.VerbosePrint("[+] beacon: ALIVE")
+			output.VerbosePrint(fmt.Sprintf("[+] Beacon (%s): ALIVE", a.GetCurrentContactName()))
 			beacon["sleep"] = int(beacon["sleep"].(float64))
 			beacon["watchdog"] = int(beacon["watchdog"].(float64))
 			beacon["instructions"] = commands
@@ -247,6 +252,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 		result["output"] = commandOutput
 		result["status"] = status
 		result["pid"] = pid
+		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
 }
@@ -259,7 +265,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]string) error {
 	if len(contact.CommunicationChannels) > 0 {
 		if requestedChannel, ok := requestedChannelConfig["c2Name"]; ok {
-			if err := a.attemptSelectComChannel(requestedChannelConfig, requestedChannel); err == nil {
+			if err := a.AttemptSelectComChannel(requestedChannelConfig, requestedChannel); err == nil {
 				return nil
 			}
 		}
@@ -271,18 +277,18 @@ func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]strin
 }
 
 // Attempts to set a given communication channel for the agent.
-func (a *Agent) attemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error {
+func (a *Agent) AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error {
 	coms, ok := contact.CommunicationChannels[requestedChannel]
 	output.VerbosePrint(fmt.Sprintf("[*] Attempting to set channel %s", requestedChannel))
 	if !ok {
 		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
+	a.updateUpstreamComs(coms)
 	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), requestedChannelConfig)
 	if valid {
 		if config != nil {
 			a.modifyAgentConfiguration(config)
 		}
-		a.updateUpstreamComs(coms)
 		output.VerbosePrint(fmt.Sprintf("[*] Set communication channel to %s", requestedChannel))
 		return nil
 	}
@@ -352,7 +358,7 @@ func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
 
 // Will request payload bytes from the C2 for the specified payload and return them.
 func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
-	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes: %s", payload))
+	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes via C2 channel %s: %s", a.GetCurrentContactName(), payload))
 	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
 }
 
@@ -469,3 +475,9 @@ func (a *Agent) DiscoverPeers() {
     <-ctx.Done()
 }
 
+func (a *Agent) GetCurrentContactName() string {
+	if currContact := a.GetBeaconContact(); currContact != nil {
+		return currContact.GetName()
+	}
+	return ""
+}
