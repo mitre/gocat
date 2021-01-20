@@ -283,30 +283,6 @@ func (a *Agent) UploadFiles(uploadInfo []interface{}) {
 			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
 		}
 	}
-
- 	// Perform any uploads after sending execution results
- 	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
- 		uploads, ok := instruction["uploads"].([]interface{})
- 		if !ok {
- 			output.VerbosePrint(fmt.Sprintf(
-				"[!] Error: expected []string, but received %T for upload info",
-				instruction["uploads"],
-			))
- 		} else {
- 			a.UploadFiles(uploads)
- 		}
- 	}
-}
-
-// Uploads files according the specified encoding mechanism, if available.
-func (a *Agent) UploadFiles(uploadInfo []interface{}) {
-	for _, path := range uploadInfo {
-		filePath := path.(string)
-		output.VerbosePrint(fmt.Sprintf("Uploading file: %s", filePath))
-		if err := a.beaconContact.UploadFile(a.GetFullProfile(), filePath); err != nil {
-			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
-		}
-	}
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
