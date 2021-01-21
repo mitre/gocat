@@ -1,5 +1,10 @@
 package contact
 
+import (
+	"errors"
+	"fmt"
+)
+
 const (
 	ok = 200
 	created = 201
@@ -14,13 +19,23 @@ type Contact interface {
 	GetName() string
 }
 
-//CommunicationChannels contains the contact implementations
-var CommunicationChannels = map[string]Contact{}
+// LoadedContacts contains the contact implementations
+var LoadedContacts = map[string]Contact{}
 
-func GetAvailableCommChannels() []string {
-	channels := make([]string, 0, len(CommunicationChannels))
-	for k := range CommunicationChannels {
-		channels = append(channels, k)
+func GetAvailableContactNames() []string {
+	contacts := make([]string, 0, len(LoadedContacts))
+	for k := range LoadedContacts {
+		contacts = append(contacts, k)
 	}
-	return channels
+	return contacts
+}
+
+func GetContactByName(contactName string) (Contact, error) {
+	if len(LoadedContacts) > 0 {
+		if requestedContact, ok := LoadedContacts[contactName]; ok {
+			return requestedContact, nil
+		}
+		return nil, errors.New(fmt.Sprintf("Requested contact %s not available", contactName))
+	}
+	return nil, errors.New("No loaded C2 contact implementations found.")
 }
