@@ -11,28 +11,23 @@ import (
 	"runtime"
 	"sync"
 	"time"
-	"context"
-	"strings"
 
 	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
 	"github.com/mitre/gocat/proxy"
-	"github.com/grandcat/zeroconf"
 )
 
 var beaconFailureThreshold = 3
 
 type AgentInterface interface {
-	Heartbeat()
 	Beacon() map[string]interface{}
 	Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool) error
 	RunInstruction(command map[string]interface{}, payloads []string, submitResults bool)
 	Terminate()
 	GetFullProfile() map[string]interface{}
 	GetTrimmedProfile() map[string]interface{}
-	SetCommunicationChannels(c2Config map[string]string) error
 	SetPaw(paw string)
 	Display()
 	DownloadPayloads(payloads []interface{}) []string
@@ -41,15 +36,20 @@ type AgentInterface interface {
 	TerminateLocalP2pReceivers()
 	HandleBeaconFailure() error
 	DiscoverPeers()
-	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
+	CheckAndSetCommsChannel(server string, c2Protocol string, c2Key string) error
+	GetCurrentContact() contact.Contact
 	GetCurrentContactName() string
 	UploadFiles(instruction map[string]interface{})
+	MarkCurrCommsAsSuccessful()
+	SetWatchdog(newVal int)
+	UpdateCheckinTime(checkin time.Time)
+	EvaluateWatchdog() bool
+	SwitchC2Contact(newContactName string, newKey string) error
 }
 
 // Implements AgentInterface
 type Agent struct {
 	// Profile fields
-	server string
 	group string
 	host string
 	username string
@@ -64,11 +64,16 @@ type Agent struct {
 	paw string
 	initialDelay float64
 	originLinkID int
+	watchdog int
+	checkin time.Time
 
-	// Communication methods
-	beaconContact contact.Contact
-	heartbeatContact contact.Contact
+	// Communication-related info
+	agentComms AgentCommsChannel
+	validatedCommsChannels map[string]AgentCommsChannel // map "protocol-server" string to validated comms channel object.
 	failedBeaconCounter int
+	successfulCommsChannels []AgentCommsChannel // List of historically successful comms channels
+	tryingSwitchedContact bool // true if agent is trying a different C2 contact
+	successFulCommsChannelIndex int
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -77,7 +82,6 @@ type Agent struct {
 	localP2pReceiverAddresses map[string][]string // maps P2P protocol to receiver addresses listening on this machine
 	availablePeerReceivers map[string][]string // maps P2P protocol to receiver addresses running on peer machines
 	exhaustedPeerReceivers map[string][]string // maps P2P protocol to receiver addresses that the agent has tried using.
-	usingPeerReceivers bool // True if connecting to C2 via proxy peer
 
 	// Deadman instructions to run before termination. Will be list of instruction mappings.
 	deadmanInstructions []map[string]interface{}
@@ -94,7 +98,6 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	} else {
 		return err
 	}
-	a.server = server
 	a.group = group
 	a.host = host
 	a.architecture = runtime.GOARCH
@@ -108,6 +111,11 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.initialDelay = float64(initialDelay)
 	a.failedBeaconCounter = 0
 	a.originLinkID = originLinkID
+	a.successfulCommsChannels = make([]AgentCommsChannel, 0)
+	a.validatedCommsChannels = map[string]AgentCommsChannel{}
+	a.tryingSwitchedContact = true
+	a.successFulCommsChannelIndex = 0
+	a.watchdog = 0
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
@@ -116,7 +124,6 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 
 	// Load peer proxy receiver information
 	a.exhaustedPeerReceivers = make(map[string][]string)
-	a.usingPeerReceivers = false
 	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
 	a.availablePeerReceivers[c2Config["c2Name"]] = append(a.availablePeerReceivers[c2Config["c2Name"]], server)
 	if err != nil {
@@ -124,9 +131,15 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	}
 	a.DiscoverPeers()
 
-	// Set up contacts
-	if err = a.SetCommunicationChannels(c2Config); err != nil {
-		return err
+	// Set up initial agent comms. Resort to peer-to-peer if needed.
+	if err = a.setInitialCommsChannel(server, c2Config); err != nil {
+		// print error, fall back to proxy
+		output.VerbosePrint(fmt.Sprintf("[!] Error attempting to set comms channel for %s via %s: %s", server, c2Config["c2Name"], err.Error()))
+		output.VerbosePrint("[!] Requested communication channel not valid or available. Resorting to peer-to-peer.")
+		if err = a.switchToFirstAvailablePeerProxyClient(); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error when finding available peer proxy client: %s", err.Error()))
+			return errors.New("Unable to set requested initial comms channel and unable to find available peer proxy clients.")
+		}
 	}
 
 	// Set up P2P receivers.
@@ -142,12 +155,13 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 
 // Returns full profile for agent.
 func (a *Agent) GetFullProfile() map[string]interface{} {
+	// TODO change how we get beacon contact name
 	return map[string]interface{}{
 		"paw": a.paw,
-		"server": a.server,
+		"server": a.getCurrentServerAddress(),
 		"group": a.group,
 		"host": a.host,
-		"contact": a.beaconContact.GetName(),
+		"contact": a.GetCurrentContactName(),
 		"username": a.username,
 		"architecture": a.architecture,
 		"platform": a.platform,
@@ -160,7 +174,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"proxy_receivers": a.localP2pReceiverAddresses,
 		"origin_link_id": a.originLinkID,
 		"deadman_enabled": true,
-		"available_contacts": contact.GetAvailableCommChannels(),
+		"available_contacts": contact.GetAvailableContactNames(),
 	}
 }
 
@@ -168,18 +182,19 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 	return map[string]interface{}{
 		"paw": a.paw,
-		"server": a.server,
+		"server": a.getCurrentServerAddress(),
 		"platform": a.platform,
 		"host": a.host,
-		"contact": a.beaconContact.GetName(),
+		"contact": a.GetCurrentContactName(),
 	}
+	// TODO change how we get beacon name
 }
 
 // Pings C2 for instructions and returns them.
 func (a *Agent) Beacon() map[string]interface{} {
 	var beacon map[string]interface{}
 	profile := a.GetFullProfile()
-	response := a.beaconContact.GetBeaconBytes(profile)
+	response := a.GetCurrentContact().GetBeaconBytes(profile)
 	if response != nil {
 		beacon = a.processBeacon(response)
 	} else {
@@ -205,23 +220,6 @@ func (a *Agent) processBeacon(data []byte) map[string]interface{} {
 		}
 	}
 	return beacon
-}
-
-// If too many consecutive failures occur for the current communication method, switch to a new proxy method.
-// Return an error if switch fails.
-func (a *Agent) HandleBeaconFailure() error {
-	a.failedBeaconCounter += 1
-	if a.failedBeaconCounter >= beaconFailureThreshold {
-		// Reset counter and try switching proxy methods
-		a.failedBeaconCounter = 0
-		output.VerbosePrint("[!] Reached beacon failure threshold. Attempting to switch to new peer proxy method.")
-		return a.findAvailablePeerProxyClient()
-	}
-	return nil
-}
-
-func (a *Agent) Heartbeat() {
-	// Add any heartbeat functionality here.
 }
 
 func (a *Agent) Terminate() {
@@ -256,7 +254,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 		result["status"] = status
 		result["pid"] = pid
 		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
-		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+		a.GetCurrentContact().SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
 
  	// Perform any uploads after sending execution results
@@ -295,55 +293,14 @@ func (a *Agent) uploadSingleFile(path string) error {
 	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
 }
 
-// Sets the communication channels for the agent according to the specified channel configuration map.
-// Will resort to peer-to-peer if agent doesn't support the requested channel or if the C2's requirements
-// are not met. If the original requested channel cannot be used and there are no compatible peer proxy receivers,
-// then an error will be returned.
-// This method does not test connectivity to the requested server or to proxy receivers.
-func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]string) error {
-	if len(contact.CommunicationChannels) > 0 {
-		if requestedChannel, ok := requestedChannelConfig["c2Name"]; ok {
-			if err := a.AttemptSelectComChannel(requestedChannelConfig, requestedChannel); err == nil {
-				return nil
-			} else {
-				output.VerbosePrint(fmt.Sprintf("[!] Error setting comm channel: %v", err.Error()))
-			}
-		}
-		// Original requested channel not found. See if we can use any available peer-to-peer-proxy receivers.
-		output.VerbosePrint("[!] Requested communication channel not valid or available. Resorting to peer-to-peer.")
-		return a.findAvailablePeerProxyClient()
-	}
-	return errors.New("No possible C2 communication channels found.")
-}
-
-// Attempts to set a given communication channel for the agent.
-func (a *Agent) AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error {
-	coms, ok := contact.CommunicationChannels[requestedChannel]
-	output.VerbosePrint(fmt.Sprintf("[*] Attempting to set channel %s", requestedChannel))
-	if !ok {
-		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
-	}
-	a.updateUpstreamComs(coms)
-	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), requestedChannelConfig)
-	if valid {
-		if config != nil {
-			a.modifyAgentConfiguration(config)
-		}
-		output.VerbosePrint(fmt.Sprintf("[*] Set communication channel to %s", requestedChannel))
-		return nil
-	}
-	return errors.New(fmt.Sprintf("%s channel available, but requirements not met.", requestedChannel))
-}
-
 // Outputs information about the agent.
 func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("initial delay=%d", int(a.initialDelay)))
-	output.VerbosePrint(fmt.Sprintf("server=%s", a.server))
+	output.VerbosePrint(fmt.Sprintf("server=%s", a.getCurrentServerAddress()))
 	output.VerbosePrint(fmt.Sprintf("group=%s", a.group))
 	output.VerbosePrint(fmt.Sprintf("privilege=%s", a.privilege))
 	output.VerbosePrint(fmt.Sprintf("allow local p2p receivers=%v", a.enableLocalP2pReceivers))
-	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
-	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
+	output.VerbosePrint(fmt.Sprintf("contact channel=%s", a.GetCurrentContactName()))
 	if a.enableLocalP2pReceivers {
 		a.displayLocalReceiverInformation()
 	}
@@ -399,7 +356,7 @@ func (a *Agent) WritePayloadToDisk(payload string) (string, error) {
 // Will request payload bytes from the C2 for the specified payload and return them.
 func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
 	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes via C2 channel %s: %s", a.GetCurrentContactName(), payload))
-	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
+	return a.GetCurrentContact().GetPayloadBytes(a.GetTrimmedProfile(), payload)
 }
 
 func (a *Agent) Sleep(sleepTime float64) {
@@ -421,14 +378,6 @@ func (a *Agent) SetPaw(paw string) {
 	}
 }
 
-func (a *Agent) GetBeaconContact() contact.Contact {
-	return a.beaconContact
-}
-
-func (a *Agent) GetHeartbeatContact() contact.Contact {
-	return a.heartbeatContact
-}
-
 func (a *Agent) StoreDeadmanInstruction(instruction map[string]interface{}) {
 	a.deadmanInstructions = append(a.deadmanInstructions, instruction)
 }
@@ -447,77 +396,19 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 	}
 }
 
-func (a *Agent) updateUpstreamServer(newServer string) {
-	a.server = newServer
-	if a.localP2pReceivers != nil {
-		for _, receiver := range a.localP2pReceivers {
-			receiver.UpdateUpstreamServer(newServer)
-		}
+func (a *Agent) SetWatchdog(newVal int) {
+	if newVal <= 0 {
+		a.watchdog = 0
+	} else {
+		a.watchdog = newVal
 	}
 }
 
-func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
-	a.beaconContact = newComs
-	a.heartbeatContact = newComs
-	if a.localP2pReceivers != nil {
-		for _, receiver := range a.localP2pReceivers {
-			receiver.UpdateUpstreamComs(newComs)
-		}
-	}
+func (a *Agent) UpdateCheckinTime(checkin time.Time) {
+	a.checkin = checkin
 }
 
-func (a *Agent) evaluateNewPeers(results <- chan *zeroconf.ServiceEntry) {
-    for entry := range results {
-        for _, ip := range entry.AddrIPv4 {
-            a.mergeNewPeers(entry.Text[0], fmt.Sprintf("%s:%d", ip, entry.Port))
-        }
-    }
-}
-
-func (a *Agent) mergeNewPeers(proxyChannel string, ipPort string) {
-    peer := fmt.Sprintf("%s://%s", strings.ToLower(proxyChannel), ipPort)
-    allPeers := append(a.availablePeerReceivers[proxyChannel], a.exhaustedPeerReceivers[proxyChannel]...)
-    for _, existingPeer := range allPeers {
-        if peer == existingPeer {
-            return
-        }
-    }
-    for protocol, addressList := range a.localP2pReceiverAddresses {
-        if proxyChannel == protocol {
-            for _, address := range addressList {
-                if peer == address {
-                    return
-                }
-            }
-		}
-	}
-    a.availablePeerReceivers[proxyChannel] = append(a.availablePeerReceivers[proxyChannel], peer)
-    output.VerbosePrint(fmt.Sprintf("[*] new peer added: %s", peer))
-}
-
-func (a *Agent) DiscoverPeers() {
-    // Discover all services on the network (e.g. _workstation._tcp)
-    resolver, err := zeroconf.NewResolver(nil)
-    if err != nil {
-        output.VerbosePrint(fmt.Sprintf("[-] Failed to initialize zeroconf resolver: %s", err.Error()))
-    }
-
-    entries := make(chan *zeroconf.ServiceEntry)
-    go a.evaluateNewPeers(entries)
-
-    ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-    defer cancel()
-    err = resolver.Browse(ctx, "_service._comms", "local.", entries)
-    if err != nil {
-         output.VerbosePrint(fmt.Sprintf("[-] Failed to browse for peers: %s", err.Error()))
-    }
-
-    <-ctx.Done()
-}
-
-func (a *Agent) GetCurrentContactName() string {
-	if currContact := a.GetBeaconContact(); currContact != nil {
-		return currContact.GetName()
-	}
-	return ""
+// Returns true if agent should keep running, false if not.
+func (a *Agent) EvaluateWatchdog() bool {
+	return a.watchdog <= 0 || float64(time.Now().Sub(a.checkin).Seconds()) <= float64(a.watchdog)
 }

@@ -29,7 +29,7 @@ type API struct {
 }
 
 func init() {
-	CommunicationChannels["HTTP"] = &API{ name: "HTTP" }
+	LoadedContacts["HTTP"] = &API{ name: "HTTP" }
 }
 
 //GetInstructions sends a beacon and returns response.

