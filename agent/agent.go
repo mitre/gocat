@@ -441,6 +441,7 @@ func (a *Agent) DecodePayload(data []byte, encoding string, decodingOptions map[
 }
 
 func (a *Agent) EncodeUpload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
+	output.VerbosePrint(fmt.Sprintf("[*] Encoding upload bytes using encoding: %s", encoding))
 	if encoder, ok := encoders.DataEncoders[encoding]; ok {
 		encoded, err := encoder.EncodeData(data, decodingOptions)
 		if err != nil {
@@ -461,6 +462,7 @@ func (a *Agent) WritePayloadToDisk(payload string, encoding string, encodingOpti
 	fetchedBytes, filename := a.FetchPayloadBytes(payload, link_id)
 	var payloadBytes []byte
 	if len(encoding) > 0 {
+		output.VerbosePrint(fmt.Sprintf("[*] Decoding payload bytes using encoding: %s", encoding))
 		payloadBytes = a.DecodePayload(fetchedBytes, encoding, encodingOptions)
 	}
 	if len(payloadBytes) > 0 && len(filename) > 0 {
