@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,6 +43,7 @@ type AgentInterface interface {
 	DiscoverPeers()
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
+	UploadFiles(instruction map[string]interface{})
 }
 
 // Implements AgentInterface
@@ -257,28 +259,39 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 	}
 
  	// Perform any uploads after sending execution results
- 	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
- 		uploads, ok := instruction["uploads"].([]interface{})
- 		if !ok {
- 			output.VerbosePrint(fmt.Sprintf(
-				"[!] Error: expected []string, but received %T for upload info",
-				instruction["uploads"],
-			))
- 		} else {
- 			a.UploadFiles(uploads)
- 		}
- 	}
+ 	a.UploadFiles(instruction)
 }
 
-// Uploads files according the specified encoding mechanism, if available.
-func (a *Agent) UploadFiles(uploadInfo []interface{}) {
-	for _, path := range uploadInfo {
-		filePath := path.(string)
-		output.VerbosePrint(fmt.Sprintf("Uploading file: %s", filePath))
-		if err := a.beaconContact.UploadFile(a.GetFullProfile(), filePath); err != nil {
-			output.VerbosePrint(fmt.Sprintf("[!] Error uploading file: %v", err.Error()))
+func (a *Agent) UploadFiles(instruction map[string]interface{}) {
+	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
+		uploads, ok := instruction["uploads"].([]interface{})
+		if !ok {
+			output.VerbosePrint(fmt.Sprintf(
+				"[!] Error: expected []interface{}, but received %T for upload info",
+				instruction["uploads"],
+			))
+			return
+		}
+
+		for _, path := range uploads {
+			filePath := path.(string)
+			if err := a.uploadSingleFile(filePath); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error uploading file %s: %v", filePath, err.Error()))
+			}
 		}
 	}
+}
+
+func (a *Agent) uploadSingleFile(path string) error {
+	output.VerbosePrint(fmt.Sprintf("Uploading file: %s", path))
+
+	// Get file bytes
+	fetchedBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
