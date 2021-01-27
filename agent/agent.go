@@ -229,7 +229,7 @@ func (a *Agent) Terminate() {
 }
 
 // Runs a single instruction and send results.
-func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string, submitResults bool) {
+func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []string, submitResultsImmediately bool) (map[string]interface{}) {
 	result := make(map[string]interface{})
 	info := execute.InstructionInfo{
 		Profile: a.GetTrimmedProfile(),
@@ -242,13 +242,14 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 			output.VerbosePrint("[!] Failed to delete payload: " + payloadPath)
 		}
 	}
-	if submitResults {
-		result["id"] = instruction["id"]
-		result["output"] = commandOutput
-		result["status"] = status
-		result["pid"] = pid
+	result["id"] = instruction["id"]
+	result["output"] = commandOutput
+	result["status"] = status
+	result["pid"] = pid
+	if submitResultsImmediately {
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
+	return result
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
