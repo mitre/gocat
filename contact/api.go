@@ -144,6 +144,7 @@ func (a *API) UploadFileBytes(profile map[string]interface{}, uploadName string,
 		"X-Request-Id": fmt.Sprintf("%s-%s", profile["host"].(string), profile["paw"].(string)),
 		"User-Agent": userAgent,
 		"X-Paw": profile["paw"].(string),
+		"X-Host": profile["host"].(string),
 	}
 	req, err := createUploadRequest(uploadUrl, &requestBody, headers)
 	if err != nil {
