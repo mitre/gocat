@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"strconv"
+	"strings"
 
 	"github.com/mitre/gocat/core"
 )
@@ -27,7 +28,7 @@ func main() {
 	if err != nil {
 		parsedListenP2P = false
 	}
-	server := flag.String("server", server, "The FQDN of the server")
+	server := strings.TrimRight(*flag.String("server", server, "The FQDN of the server"), "/")
 	httpProxyUrl :=  flag.String("httpProxyGateway", httpProxyGateway, "URL for the HTTP proxy gateway. For environments that use proxies to reach the internet.")
 	paw := flag.String("paw", paw, "Optionally specify a PAW on intialization")
 	group := flag.String("group", group, "Attach a group to this agent")
@@ -40,5 +41,5 @@ func main() {
 	flag.Parse()
 
 	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
-	core.Core(*server, *group, *delay, c2Config, *listenP2P, *verbose, *paw, *originLinkID)
+	core.Core(server, *group, *delay, c2Config, *listenP2P, *verbose, *paw, *originLinkID)
 }

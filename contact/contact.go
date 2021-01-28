@@ -16,3 +16,11 @@ type Contact interface {
 
 //CommunicationChannels contains the contact implementations
 var CommunicationChannels = map[string]Contact{}
+
+func GetAvailableCommChannels() []string {
+	channels := make([]string, 0, len(CommunicationChannels))
+	for k := range CommunicationChannels {
+		channels = append(channels, k)
+	}
+	return channels
+}

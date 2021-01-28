@@ -51,6 +51,18 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 			sandcatAgent.SetPaw(beacon["paw"].(string))
 			checkin = time.Now()
 		}
+
+		// Check if we need to change contacts
+		if beacon["new_contact"] != nil {
+			newChannel := beacon["new_contact"].(string)
+			c2Config["c2Name"] = newChannel
+			output.VerbosePrint(fmt.Sprintf("Received request to switch from C2 channel %s to %s", sandcatAgent.GetCurrentContactName(), newChannel))
+			if err := sandcatAgent.AttemptSelectComChannel(c2Config, newChannel); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error switching communication channels: %s", err.Error()))
+			}
+		}
+
+		// Handle instructions
 		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
 			// Run commands and send results.
 			instructions := reflect.ValueOf(beacon["instructions"])

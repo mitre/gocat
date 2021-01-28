@@ -56,7 +56,7 @@ func (a *Agent) findAvailablePeerProxyClient() error {
 			output.VerbosePrint(fmt.Sprintf("[-] Verifying proxy channel %s", proxyChannel))
 
 			// Attempt to set the new coms channel.
-			if err := a.attemptSelectComChannel(nil, proxyChannel); err != nil {
+			if err := a.AttemptSelectComChannel(nil, proxyChannel); err != nil {
 				output.VerbosePrint(fmt.Sprintf("[!] Error attempting to use proxy channel %s: %s", proxyChannel, err.Error()))
 
 				// Remove the invalid proxy channel from the pool. Safe to remove during iteration.
