@@ -22,11 +22,16 @@ type Executor interface {
 	Run(command string, timeout int, info InstructionInfo) ([]byte, string, string)
 	String() string
 	CheckIfAvailable() bool
+
+	// Returns true if the executor wants the payload downloaded to memory, false if it wants the payload on disk.
+	DownloadPayloadToMemory(payloadName string) bool
 }
 
 type InstructionInfo struct {
 	Profile map[string]interface{}
 	Instruction map[string]interface{}
+	OnDiskPayloads []string
+	InMemoryPayloads map[string][]byte
 }
 
 func AvailableExecutors() (values []string) {
@@ -39,10 +44,11 @@ func AvailableExecutors() (values []string) {
 var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
-func RunCommand(info InstructionInfo, payloads []string) ([]byte, string, string) {
+func RunCommand(info InstructionInfo) ([]byte, string, string) {
 	encodedCommand := info.Instruction["command"].(string)
 	executor := info.Instruction["executor"].(string)
 	timeout := int(info.Instruction["timeout"].(float64))
+	onDiskPayloads := info.OnDiskPayloads
 	var status string
 	var result []byte
 	var pid string
@@ -53,7 +59,7 @@ func RunCommand(info InstructionInfo, payloads []string) ([]byte, string, string
 		pid = ERROR_STATUS
 	} else {
 		command := string(decoded)
-		missingPaths := checkPayloadsAvailable(payloads)
+		missingPaths := checkPayloadsAvailable(onDiskPayloads)
 		if len(missingPaths) == 0 {
 			result, status, pid = Executors[executor].Run(command, timeout, info)
 		} else {
