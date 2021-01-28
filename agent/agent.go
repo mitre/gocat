@@ -28,14 +28,14 @@ type AgentInterface interface {
 	Heartbeat()
 	Beacon() map[string]interface{}
 	Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool) error
-	RunInstruction(command map[string]interface{}, onDiskPayloads []string, inMemoryPayloads map[string][]byte, submitResults bool)
+	RunInstruction(instruction map[string]interface{}, submitResults bool)
 	Terminate()
 	GetFullProfile() map[string]interface{}
 	GetTrimmedProfile() map[string]interface{}
 	SetCommunicationChannels(c2Config map[string]string) error
 	SetPaw(paw string)
 	Display()
-	DownloadPayloadsForInstruction(instruction map[string]interface{}) (string, map[string][]byte)
+	DownloadPayloadsForInstruction(instruction map[string]interface{}) ([]string, map[string][]byte)
 	FetchPayloadBytes(payload string) []byte
 	ActivateLocalP2pReceivers()
 	TerminateLocalP2pReceivers()
@@ -236,15 +236,19 @@ func (a *Agent) Terminate() {
 	output.VerbosePrint("[*] Terminating Sandcat Agent... goodbye.")
 }
 
-// Runs a single instruction and send results.
-func (a *Agent) RunInstruction(instruction map[string]interface{}, onDiskPayloads []string, inMemoryPayloads map[string][]byte, submitResults bool) {
+// Runs a single instruction and send results if specified.
+// Will handle payload downloads according to executor.
+func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults bool) {
 	result := make(map[string]interface{})
+	onDiskPayloads, inMemoryPayloads := a.DownloadPayloadsForInstruction(instruction)
 	info := execute.InstructionInfo{
 		Profile: a.GetTrimmedProfile(),
 		Instruction: instruction,
 		OnDiskPayloads: onDiskPayloads,
 		InMemoryPayloads: inMemoryPayloads,
 	}
+
+	// Execute command
 	commandOutput, status, pid := execute.RunCommand(info)
 
 	// Clean up payloads
@@ -463,8 +467,7 @@ func (a *Agent) StoreDeadmanInstruction(instruction map[string]interface{}) {
 func (a *Agent) ExecuteDeadmanInstructions() {
 	for _, instruction := range a.deadmanInstructions {
 		output.VerbosePrint(fmt.Sprintf("[*] Running deadman instruction %s", instruction["id"]))
-		droppedPayloads, inMemoryPayloads := a.DownloadPayloadsForInstruction(instruction)
-		a.RunInstruction(instruction, droppedPayloads, inMemoryPayloads, false)
+		a.RunInstruction(instruction, false)
 	}
 }
 
