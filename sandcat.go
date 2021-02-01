@@ -4,6 +4,7 @@ import (
 	"flag"
 	"strconv"
 	"strings"
+
 	"github.com/mitre/gocat/core"
 )
 
