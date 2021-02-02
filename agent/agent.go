@@ -395,12 +395,3 @@ func (a *Agent) SetWatchdog(newVal int) {
 		a.watchdog = newVal
 	}
 }
-
-func (a *Agent) UpdateCheckinTime(checkin time.Time) {
-	a.checkin = checkin
-}
-
-// Returns true if agent should keep running, false if not.
-func (a *Agent) EvaluateWatchdog() bool {
-	return a.watchdog <= 0 || float64(time.Now().Sub(a.checkin).Seconds()) <= float64(a.watchdog)
-}
