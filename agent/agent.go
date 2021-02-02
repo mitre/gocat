@@ -387,11 +387,3 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 		a.SetPaw(val)
 	}
 }
-
-func (a *Agent) SetWatchdog(newVal int) {
-	if newVal <= 0 {
-		a.watchdog = 0
-	} else {
-		a.watchdog = newVal
-	}
-}
