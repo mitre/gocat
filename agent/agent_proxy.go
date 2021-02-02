@@ -51,8 +51,8 @@ func (a *Agent) switchToFirstAvailablePeerProxyClient() error {
 		if len(a.exhaustedPeerReceivers) == 0 {
 			return errors.New("No peer proxy receivers available to connect to.")
 		}
+		output.VerbosePrint("[*] All available peer proxy receivers have been tried. Retrying them.")
 		a.refreshAvailablePeerReceivers()
-		return errors.New("All available peer proxy receivers have been tried.")
 	}
 	for proxyChannel, receiverAddresses := range a.availablePeerReceivers {
 		for i := len(receiverAddresses) - 1; i >= 0; i-- {

@@ -43,7 +43,10 @@ func runAgent (sandcatAgent *agent.Agent) {
 	for (sandcatAgent.EvaluateWatchdog()) {
 		// Send beacon and process response.
 		beacon := sandcatAgent.Beacon()
-		processBeaconResponse(sandcatAgent, beacon)
+		if err := processBeaconResponse(sandcatAgent, beacon); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
+			return
+		}
 
 		// randomly check for dynamically discoverable peer agents on the network
 		if findPeers(lastDiscovery, sandcatAgent) {
@@ -52,20 +55,19 @@ func runAgent (sandcatAgent *agent.Agent) {
 	}
 }
 
-func processBeaconResponse(sandcatAgent *agent.Agent, beacon map[string]interface{}) {
+func processBeaconResponse(sandcatAgent *agent.Agent, beacon map[string]interface{}) error {
 	// Process beacon response.
 	if len(beacon) != 0 {
 		sandcatAgent.SetPaw(beacon["paw"].(string))
 		sandcatAgent.UpdateCheckinTime(time.Now())
 		sandcatAgent.SetWatchdog(beacon["watchdog"].(int))
-		sandcatAgent.MarkCurrCommsAsSuccessful()
 	} else {
 		// Failed beacon
 		if err := sandcatAgent.HandleBeaconFailure(); err != nil {
-			output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
+			return err
 		}
 		sandcatAgent.Sleep(float64(15))
-		return
+		return nil
 	}
 
 	// Check if we need to change contacts
@@ -79,6 +81,7 @@ func processBeaconResponse(sandcatAgent *agent.Agent, beacon map[string]interfac
 	} else {
 		sandcatAgent.Sleep(float64(beacon["sleep"].(int)))
 	}
+	return nil
 }
 
 func changeAgentContact(sandcatAgent *agent.Agent, newChannel string) {

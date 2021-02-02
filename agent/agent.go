@@ -40,10 +40,6 @@ type AgentInterface interface {
 	GetCurrentContact() contact.Contact
 	GetCurrentContactName() string
 	UploadFiles(instruction map[string]interface{})
-	MarkCurrCommsAsSuccessful()
-	SetWatchdog(newVal int)
-	UpdateCheckinTime(checkin time.Time)
-	EvaluateWatchdog() bool
 	SwitchC2Contact(newContactName string, newKey string) error
 }
 
@@ -71,9 +67,7 @@ type Agent struct {
 	agentComms AgentCommsChannel
 	validatedCommsChannels map[string]AgentCommsChannel // map "protocol-server" string to validated comms channel object.
 	failedBeaconCounter int
-	successfulCommsChannels []AgentCommsChannel // List of historically successful comms channels
 	tryingSwitchedContact bool // true if agent is trying a different C2 contact
-	successFulCommsChannelIndex int
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -111,10 +105,8 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.initialDelay = float64(initialDelay)
 	a.failedBeaconCounter = 0
 	a.originLinkID = originLinkID
-	a.successfulCommsChannels = make([]AgentCommsChannel, 0)
 	a.validatedCommsChannels = map[string]AgentCommsChannel{}
 	a.tryingSwitchedContact = true
-	a.successFulCommsChannelIndex = 0
 	a.watchdog = 0
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
