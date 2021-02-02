@@ -403,6 +403,7 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 
 		// Ask executor what to do with the payload bytes (keep in memory or save to disk)
 		if executor.DownloadPayloadToMemory(payloadName) {
+			output.VerbosePrint(fmt.Sprintf("[*] Storing payload %s in memory", payloadName))
 			inMemoryPayloads[payloadName] = payloadBytes
 		} else {
 			if location, err := a.WritePayloadToDisk(payloadName, payloadBytes); err != nil {
@@ -421,6 +422,7 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 func (a *Agent) WritePayloadToDisk(filename string, payloadBytes []byte) (string, error) {
 	location := filepath.Join(filename)
 	if !fileExists(location) {
+		output.VerbosePrint(fmt.Sprintf("[*] Writing payload %s to disk at %s", filename, location))
 		return location, writePayloadBytes(location, payloadBytes)
 	}
 	output.VerbosePrint(fmt.Sprintf("[*] File %s already exists", filename))
