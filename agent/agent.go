@@ -116,6 +116,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.exhaustedPeerReceivers = make(map[string][]string)
 	a.usingPeerReceivers = false
 	a.availablePeerReceivers, err = proxy.GetAvailablePeerReceivers()
+	a.availablePeerReceivers[c2Config["c2Name"]] = append(a.availablePeerReceivers[c2Config["c2Name"]], server)
 	if err != nil {
 		return err
 	}

@@ -73,3 +73,17 @@ func updatePeerChain(clientProfile map[string]interface{}, forwarderPaw string, 
 	proxyChain = append(proxyChain, nextHop)
 	clientProfile["proxy_chain"] = proxyChain
 }
+
+// check if a given address/paw is contained in the peer chain
+func isInPeerChain(clientProfile map[string]interface{}, searchPaw string) bool {
+    // Proxy chain is a list of length-3 lists ([forwarder paw, receiver address, peer protocol])
+	if _, ok := clientProfile["proxy_chain"]; ok {
+		proxyChain := clientProfile["proxy_chain"].([]interface{})
+		for _, peer := range proxyChain {
+		    if peer.([]interface{})[0].(string) == searchPaw {
+		        return true
+		    }
+		}
+	}
+	return false
+}
