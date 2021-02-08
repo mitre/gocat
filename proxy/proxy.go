@@ -14,6 +14,8 @@ const (
 	RESPONSE_INSTRUCTIONS = 4
 	RESPONSE_PAYLOAD_BYTES = 5
 	ACK_EXECUTION_RESULTS = 6
+	SEND_FILE_UPLOAD_BYTES = 7
+	RESPONSE_FILE_UPLOAD = 8
 )
 
 // P2pReceiver defines required functions for relaying messages between peers and an upstream peer/c2.
