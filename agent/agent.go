@@ -60,8 +60,6 @@ type Agent struct {
 	paw string
 	initialDelay float64
 	originLinkID int
-	watchdog int
-	checkin time.Time
 
 	// Communication-related info
 	agentComms AgentCommsChannel
@@ -107,7 +105,6 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.originLinkID = originLinkID
 	a.validatedCommsChannels = map[string]AgentCommsChannel{}
 	a.tryingSwitchedContact = true
-	a.watchdog = 0
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
@@ -282,7 +279,7 @@ func (a *Agent) uploadSingleFile(path string) error {
 		return err
 	}
 
-	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
+	return a.GetCurrentContact().UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
 }
 
 // Outputs information about the agent.
