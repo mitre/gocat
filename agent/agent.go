@@ -25,7 +25,6 @@ import (
 var beaconFailureThreshold = 3
 
 type AgentInterface interface {
-	Heartbeat()
 	Beacon() map[string]interface{}
 	Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool) error
 	RunInstruction(instruction map[string]interface{}, submitResults bool)
@@ -67,7 +66,6 @@ type Agent struct {
 
 	// Communication methods
 	beaconContact contact.Contact
-	heartbeatContact contact.Contact
 	failedBeaconCounter int
 
 	// peer-to-peer info
@@ -220,10 +218,6 @@ func (a *Agent) HandleBeaconFailure() error {
 	return nil
 }
 
-func (a *Agent) Heartbeat() {
-	// Add any heartbeat functionality here.
-}
-
 func (a *Agent) Terminate() {
 	// Add any cleanup/termination functionality here.
 	output.VerbosePrint("[*] Beginning agent termination.")
@@ -357,7 +351,6 @@ func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("privilege=%s", a.privilege))
 	output.VerbosePrint(fmt.Sprintf("allow local p2p receivers=%v", a.enableLocalP2pReceivers))
 	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
-	output.VerbosePrint(fmt.Sprintf("heartbeat channel=%s", a.heartbeatContact.GetName()))
 	if a.enableLocalP2pReceivers {
 		a.displayLocalReceiverInformation()
 	}
@@ -458,10 +451,6 @@ func (a *Agent) GetBeaconContact() contact.Contact {
 	return a.beaconContact
 }
 
-func (a *Agent) GetHeartbeatContact() contact.Contact {
-	return a.heartbeatContact
-}
-
 func (a *Agent) StoreDeadmanInstruction(instruction map[string]interface{}) {
 	a.deadmanInstructions = append(a.deadmanInstructions, instruction)
 }
@@ -490,7 +479,6 @@ func (a *Agent) updateUpstreamServer(newServer string) {
 
 func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
 	a.beaconContact = newComs
-	a.heartbeatContact = newComs
 	if a.localP2pReceivers != nil {
 		for _, receiver := range a.localP2pReceivers {
 			receiver.UpdateUpstreamComs(newComs)
