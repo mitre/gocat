@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/user"
 	"os/exec"
+	"net"
 )
 
 // Checks for a file
@@ -46,3 +47,36 @@ func getUsername() (string, error) {
 		return userInfo.Username, nil
 	}
 }
+
+func getHostIPAddrs() ([]string, error) {
+    ifaces, err := net.Interfaces()
+    if err != nil {
+        return nil, err
+    }
+    var ipAddrs []string
+    for _, i := range ifaces {
+        addrs, err := i.Addrs()
+        if err != nil {
+            return nil, err
+        }
+        for _, addr := range addrs {
+            var ip net.IP
+            switch v := addr.(type) {
+            case *net.IPNet:
+                    ip = v.IP
+            case *net.IPAddr:
+                    ip = v.IP
+            }
+            ipv4 := ip.To4()
+            if ipv4 != nil && !ip.IsLoopback() {
+                ipAddrs = append(ipAddrs, ipv4.String())
+            }
+        }
+    }
+    return ipAddrs, nil
+}
+
+
+
+
+

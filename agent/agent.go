@@ -64,6 +64,7 @@ type Agent struct {
 	paw string
 	initialDelay float64
 	originLinkID int
+	hostIPAddrs []string
 
 	// Communication methods
 	beaconContact contact.Contact
@@ -108,6 +109,11 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.initialDelay = float64(initialDelay)
 	a.failedBeaconCounter = 0
 	a.originLinkID = originLinkID
+
+	a.hostIPAddrs, err = getHostIPAddrs()
+	if err != nil {
+	    return err
+	}
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
 	if paw != "" {
@@ -161,6 +167,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"origin_link_id": a.originLinkID,
 		"deadman_enabled": true,
 		"available_contacts": contact.GetAvailableCommChannels(),
+		"host_ips": a.hostIPAddrs,
 	}
 }
 
