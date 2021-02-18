@@ -75,8 +75,3 @@ func getHostIPAddrs() ([]string, error) {
     }
     return ipAddrs, nil
 }
-
-
-
-
-
