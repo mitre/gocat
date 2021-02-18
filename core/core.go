@@ -77,8 +77,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 						sandcatAgent.StoreDeadmanInstruction(instruction)
 					} else {
 						output.VerbosePrint(fmt.Sprintf("[*] Running instruction %s", instruction["id"]))
-						droppedPayloads := sandcatAgent.DownloadPayloads(instruction["payloads"].([]interface{}))
-						go sandcatAgent.RunInstruction(instruction, droppedPayloads, true)
+						go sandcatAgent.RunInstruction(instruction, true)
 						sandcatAgent.Sleep(instruction["sleep"].(float64))
 					}
 				}

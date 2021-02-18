@@ -34,4 +34,8 @@ func (p *Powershell) String() string {
 
 func (p *Powershell) CheckIfAvailable() bool {
 	return checkExecutorInPath(p.path)
-} 
+}
+
+func (p* Powershell) DownloadPayloadToMemory(payloadName string) bool {
+	return false
+}

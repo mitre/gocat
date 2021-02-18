@@ -35,3 +35,7 @@ func (c *Cmd) String() string {
 func (c *Cmd) CheckIfAvailable() bool {
 	return checkExecutorInPath(c.path)
 }
+
+func (c* Cmd) DownloadPayloadToMemory(payloadName string) bool {
+	return false
+}

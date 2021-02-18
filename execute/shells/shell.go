@@ -31,3 +31,7 @@ func (s *Sh) String() string {
 func (s *Sh) CheckIfAvailable() bool {
 	return checkExecutorInPath(s.path)
 }
+
+func (s* Sh) DownloadPayloadToMemory(payloadName string) bool {
+	return false
+}
