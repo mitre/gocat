@@ -10,7 +10,7 @@ import (
 
 func (a *Agent) ActivateLocalP2pReceivers() {
 	for receiverName, p2pReceiver := range proxy.P2pReceiverChannels {
-		if err := p2pReceiver.InitializeReceiver(a.server, a.beaconContact, a.p2pReceiverWaitGroup); err != nil {
+		if err := p2pReceiver.InitializeReceiver(&a.server, &a.beaconContact, a.p2pReceiverWaitGroup); err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Error when initializing p2p receiver %s: %s", receiverName, err.Error()))
 		} else {
 			output.VerbosePrint(fmt.Sprintf("[*] Initialized p2p receiver %s", receiverName))
@@ -63,11 +63,11 @@ func (a *Agent) findAvailablePeerProxyClient() error {
 				delete(a.availablePeerReceivers, proxyChannel)
 				continue
 			}
-			// Successfully set the channel. Update server.
+			// Successfully set the channel. Update dest address.
 			a.usingPeerReceivers = true
 			addressToUse := receiverAddresses[0]
-			a.updateUpstreamServer(addressToUse)
-			output.VerbosePrint(fmt.Sprintf("[*] Updated agent's server to proxy peer address: %s", addressToUse))
+			a.updateUpstreamDestAddr(addressToUse)
+			output.VerbosePrint(fmt.Sprintf("[*] Updated agent's destination address to proxy peer address: %s", addressToUse))
 
 			// Mark proxy channel and peer receiver address as used.
 			a.markPeerReceiverAsUsed(proxyChannel, addressToUse)
