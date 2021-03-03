@@ -167,7 +167,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"origin_link_id": a.originLinkID,
 		"deadman_enabled": true,
 		"available_contacts": contact.GetAvailableCommChannels(),
-		"host_ips": a.hostIPAddrs,
+		"host_ip_addrs": a.hostIPAddrs,
 	}
 }
 
