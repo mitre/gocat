@@ -110,7 +110,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	a.failedBeaconCounter = 0
 	a.originLinkID = originLinkID
 
-	a.hostIPAddrs, err = getLocalIPv4Addresses()
+	a.hostIPAddrs, err = proxy.GetLocalIPv4Addresses()
 	if err != nil {
 	    return err
 	}
