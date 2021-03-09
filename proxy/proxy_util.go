@@ -3,6 +3,7 @@ package proxy
 import (
 	"encoding/base64"
 	"encoding/json"
+	"net"
 )
 
 // Build p2p message and return the bytes of its JSON marshal.
@@ -86,4 +87,35 @@ func isInPeerChain(clientProfile map[string]interface{}, searchPaw string) bool 
 		}
 	}
 	return false
+}
+
+// Return list of local IPv4 addresses for this machine (exclude loopback and unspecified addresses)
+func GetLocalIPv4Addresses() ([]string, error) {
+	var localIpList []string
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		for _, addr := range addrs {
+			var ipAddr net.IP
+			switch v:= addr.(type) {
+			case *net.IPNet:
+				ipAddr = v.IP
+			case *net.IPAddr:
+				ipAddr = v.IP
+			}
+			if ipAddr != nil && !ipAddr.IsLoopback() && !ipAddr.IsUnspecified() {
+			    ipv4Addr := ipAddr.To4()
+			    if ipv4Addr != nil {
+				    localIpList = append(localIpList, ipv4Addr.String())
+			    }
+			}
+		}
+	}
+	return localIpList, nil
 }
