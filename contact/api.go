@@ -26,7 +26,7 @@ var (
 type API struct {
 	name string
 	client *http.Client
-	upstreamDestAddr *string // pointer to agent's upstream dest addr
+	upstreamDestAddr string
 }
 
 func init() {
@@ -40,7 +40,7 @@ func (a *API) GetBeaconBytes(profile map[string]interface{}) []byte {
 		output.VerbosePrint(fmt.Sprintf("[-] Cannot request beacon. Error with profile marshal: %s", err.Error()))
 		return nil
 	} else {
-		address := fmt.Sprintf("%s%s", *a.upstreamDestAddr, apiBeacon)
+		address := fmt.Sprintf("%s%s", a.upstreamDestAddr, apiBeacon)
 		return a.request(address, data)
 	}
 }
@@ -51,7 +51,7 @@ func (a *API) GetPayloadBytes(profile map[string]interface{}, payload string) ([
     var filename string
     platform := profile["platform"]
     if platform != nil {
-		address := fmt.Sprintf("%s/file/download", *a.upstreamDestAddr)
+		address := fmt.Sprintf("%s/file/download", a.upstreamDestAddr)
 		req, err := http.NewRequest("POST", address, nil)
 		if err != nil {
 			output.VerbosePrint(fmt.Sprintf("[-] Failed to create HTTP request: %s", err.Error()))
@@ -102,13 +102,13 @@ func (a *API) C2RequirementsMet(profile map[string]interface{}, c2Config map[str
 	return true, nil
 }
 
-func (a *API) SetUpstreamDestAddr(upstreamDestAddr *string) {
+func (a *API) SetUpstreamDestAddr(upstreamDestAddr string) {
 	a.upstreamDestAddr = upstreamDestAddr
 }
 
 // SendExecutionResults will send the execution results to the upstream destination.
 func (a *API) SendExecutionResults(profile map[string]interface{}, result map[string]interface{}) {
-	address := fmt.Sprintf("%s%s", *a.upstreamDestAddr, apiBeacon)
+	address := fmt.Sprintf("%s%s", a.upstreamDestAddr, apiBeacon)
 	profileCopy := make(map[string]interface{})
 	for k,v := range profile {
 		profileCopy[k] = v
@@ -129,7 +129,7 @@ func (a *API) GetName() string {
 }
 
 func (a *API) UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte) error {
-	uploadUrl := *a.upstreamDestAddr + "/file/upload"
+	uploadUrl := a.upstreamDestAddr + "/file/upload"
 
 	// Set up the form
 	requestBody := bytes.Buffer{}

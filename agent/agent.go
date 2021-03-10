@@ -340,7 +340,7 @@ func (a *Agent) AttemptSelectComChannel(requestedChannelConfig map[string]string
 	if !ok {
 		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
-	coms.SetUpstreamDestAddr(&a.upstreamDestAddr)
+	coms.SetUpstreamDestAddr(a.upstreamDestAddr)
 	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), requestedChannelConfig)
 	if valid {
 		if config != nil {
@@ -484,6 +484,7 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 
 func (a *Agent) updateUpstreamDestAddr(newDestAddr string) {
 	a.upstreamDestAddr = newDestAddr
+	a.beaconContact.SetUpstreamDestAddr(newDestAddr)
 }
 
 func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
