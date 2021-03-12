@@ -20,10 +20,8 @@ const (
 
 // P2pReceiver defines required functions for relaying messages between peers and an upstream peer/c2.
 type P2pReceiver interface {
-	InitializeReceiver(server string, upstreamComs contact.Contact, waitgroup *sync.WaitGroup) error
+	InitializeReceiver(agentServer *string, upstreamComs *contact.Contact, waitgroup *sync.WaitGroup) error
 	RunReceiver() // must be run as a go routine
-	UpdateUpstreamServer(newServer string)
-	UpdateUpstreamComs(newComs contact.Contact)
 	UpdateAgentPaw(newPaw string)
 	Terminate()
 	GetReceiverAddresses() []string

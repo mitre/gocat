@@ -68,6 +68,7 @@ type Agent struct {
 	// Communication methods
 	beaconContact contact.Contact
 	failedBeaconCounter int
+	upstreamDestAddr string // address of server/peer that agent uses to contact C2
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -94,6 +95,7 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 		return err
 	}
 	a.server = server
+	a.upstreamDestAddr = server
 	a.group = group
 	a.host = host
 	a.architecture = runtime.GOARCH
@@ -151,7 +153,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"server": a.server,
 		"group": a.group,
 		"host": a.host,
-		"contact": a.beaconContact.GetName(),
+		"contact": a.GetCurrentContactName(),
 		"username": a.username,
 		"architecture": a.architecture,
 		"platform": a.platform,
@@ -176,7 +178,7 @@ func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 		"server": a.server,
 		"platform": a.platform,
 		"host": a.host,
-		"contact": a.beaconContact.GetName(),
+		"contact": a.GetCurrentContactName(),
 	}
 }
 
@@ -338,12 +340,13 @@ func (a *Agent) AttemptSelectComChannel(requestedChannelConfig map[string]string
 	if !ok {
 		return errors.New(fmt.Sprintf("%s channel not available", requestedChannel))
 	}
-	a.updateUpstreamComs(coms)
+	coms.SetUpstreamDestAddr(a.upstreamDestAddr)
 	valid, config := coms.C2RequirementsMet(a.GetFullProfile(), requestedChannelConfig)
 	if valid {
 		if config != nil {
 			a.modifyAgentConfiguration(config)
 		}
+		a.updateUpstreamComs(coms)
 		output.VerbosePrint(fmt.Sprintf("[*] Set communication channel to %s", requestedChannel))
 		return nil
 	}
@@ -354,10 +357,11 @@ func (a *Agent) AttemptSelectComChannel(requestedChannelConfig map[string]string
 func (a *Agent) Display() {
 	output.VerbosePrint(fmt.Sprintf("initial delay=%d", int(a.initialDelay)))
 	output.VerbosePrint(fmt.Sprintf("server=%s", a.server))
+	output.VerbosePrint(fmt.Sprintf("upstream dest addr=%s", a.upstreamDestAddr))
 	output.VerbosePrint(fmt.Sprintf("group=%s", a.group))
 	output.VerbosePrint(fmt.Sprintf("privilege=%s", a.privilege))
 	output.VerbosePrint(fmt.Sprintf("allow local p2p receivers=%v", a.enableLocalP2pReceivers))
-	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.beaconContact.GetName()))
+	output.VerbosePrint(fmt.Sprintf("beacon channel=%s", a.GetCurrentContactName()))
 	if a.enableLocalP2pReceivers {
 		a.displayLocalReceiverInformation()
 	}
@@ -473,24 +477,18 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 	if val, ok := config["paw"]; ok {
 		a.SetPaw(val)
 	}
+	if val, ok := config["upstreamDest"]; ok {
+		a.updateUpstreamDestAddr(val)
+	}
 }
 
-func (a *Agent) updateUpstreamServer(newServer string) {
-	a.server = newServer
-	if a.localP2pReceivers != nil {
-		for _, receiver := range a.localP2pReceivers {
-			receiver.UpdateUpstreamServer(newServer)
-		}
-	}
+func (a *Agent) updateUpstreamDestAddr(newDestAddr string) {
+	a.upstreamDestAddr = newDestAddr
+	a.beaconContact.SetUpstreamDestAddr(newDestAddr)
 }
 
 func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
 	a.beaconContact = newComs
-	if a.localP2pReceivers != nil {
-		for _, receiver := range a.localP2pReceivers {
-			receiver.UpdateUpstreamComs(newComs)
-		}
-	}
 }
 
 func (a *Agent) evaluateNewPeers(results <- chan *zeroconf.ServiceEntry) {
