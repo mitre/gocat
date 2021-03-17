@@ -168,6 +168,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"deadman_enabled": true,
 		"available_contacts": contact.GetAvailableCommChannels(),
 		"host_ip_addrs": a.hostIPAddrs,
+		"upstream_dest": a.upstreamDestAddr,
 	}
 }
 
@@ -179,6 +180,7 @@ func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 		"platform": a.platform,
 		"host": a.host,
 		"contact": a.GetCurrentContactName(),
+		"upstream_dest": a.upstreamDestAddr,
 	}
 }
 
