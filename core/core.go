@@ -3,16 +3,16 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"time"
-	"math/rand"
 
 	"github.com/mitre/gocat/agent"
 	"github.com/mitre/gocat/output"
 
-	_ "github.com/mitre/gocat/execute/donut" // necessary to initialize all submodules
-	_ "github.com/mitre/gocat/execute/shells" // necessary to initialize all submodules
+	_ "github.com/mitre/gocat/execute/donut"     // necessary to initialize all submodules
 	_ "github.com/mitre/gocat/execute/shellcode" // necessary to initialize all submodules
+	_ "github.com/mitre/gocat/execute/shells"    // necessary to initialize all submodules
 )
 
 // Initializes and returns sandcat agent.
@@ -36,12 +36,14 @@ func Core(server string, group string, delay int, c2 map[string]string, p2pRecei
 }
 
 // Establish contact with C2 and run instructions.
-func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
+func runAgent(sandcatAgent *agent.Agent, c2Config map[string]string) {
 	// Start main execution loop.
 	watchdog := 0
 	checkin := time.Now()
 	lastDiscovery := time.Now()
-	for (evaluateWatchdog(checkin, watchdog)) {
+	var sleepDuration float64
+
+	for evaluateWatchdog(checkin, watchdog) {
 		// Send beacon and get response.
 		beacon := sandcatAgent.Beacon()
 
@@ -49,6 +51,15 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 		if len(beacon) != 0 {
 			sandcatAgent.SetPaw(beacon["paw"].(string))
 			checkin = time.Now()
+			sleepDuration = float64(beacon["sleep"].(int))
+			watchdog = beacon["watchdog"].(int)
+		} else {
+			// Failed beacon
+			if err := sandcatAgent.HandleBeaconFailure(); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
+				return
+			}
+			sleepDuration = float64(15)
 		}
 
 		// Check if we need to change contacts
@@ -72,7 +83,7 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 					output.VerbosePrint(fmt.Sprintf("[-] Error unpacking command: %v", err.Error()))
 				} else {
 					// If instruction is deadman, save it for later. Otherwise, run the instruction.
-					if (instruction["deadman"].(bool)) {
+					if instruction["deadman"].(bool) {
 						output.VerbosePrint(fmt.Sprintf("[*] Received deadman instruction %s", instruction["id"]))
 						sandcatAgent.StoreDeadmanInstruction(instruction)
 					} else {
@@ -82,25 +93,14 @@ func runAgent (sandcatAgent *agent.Agent, c2Config map[string]string) {
 					}
 				}
 			}
-		} else {
-			var sleepDuration float64
-			if len(beacon) > 0 {
-				sleepDuration = float64(beacon["sleep"].(int))
-				watchdog = beacon["watchdog"].(int)
-			} else {
-				// Failed beacon
-				if err := sandcatAgent.HandleBeaconFailure(); err != nil {
-					output.VerbosePrint(fmt.Sprintf("[!] Error handling failed beacon: %s", err.Error()))
-					return
-				}
-				sleepDuration = float64(15)
-			}
-			sandcatAgent.Sleep(sleepDuration)
 		}
+
 		// randomly check for dynamically discoverable peer agents on the network
 		if findPeers(lastDiscovery, sandcatAgent) {
-		    lastDiscovery = time.Now()
+			lastDiscovery = time.Now()
 		}
+
+		sandcatAgent.Sleep(sleepDuration)
 	}
 }
 
@@ -110,12 +110,12 @@ func evaluateWatchdog(lastcheckin time.Time, watchdog int) bool {
 }
 
 func findPeers(last time.Time, sandcatAgent *agent.Agent) bool {
-    minDiscoveryInterval := 300
-    diff := float64(time.Now().Sub(last).Seconds())
-    if diff >= float64(rand.Intn(120) + minDiscoveryInterval) {
-        sandcatAgent.DiscoverPeers()
-        return true
-    } else {
-        return false
-    }
+	minDiscoveryInterval := 300
+	diff := float64(time.Now().Sub(last).Seconds())
+	if diff >= float64(rand.Intn(120)+minDiscoveryInterval) {
+		sandcatAgent.DiscoverPeers()
+		return true
+	} else {
+		return false
+	}
 }
