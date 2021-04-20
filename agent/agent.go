@@ -49,6 +49,7 @@ type AgentInterface interface {
 type Agent struct {
 	// Profile fields
 	server string
+	tunnelConfig *contact.TunnelConfig
 	group string
 	host string
 	username string
@@ -69,6 +70,8 @@ type Agent struct {
 	beaconContact contact.Contact
 	failedBeaconCounter int
 	upstreamDestAddr string // address of server/peer that agent uses to contact C2
+	tunnel contact.Tunnel
+	usingTunnel bool
 
 	// peer-to-peer info
 	enableLocalP2pReceivers bool
@@ -84,7 +87,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID int) error {
+func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID int) error {
 	host, err := os.Hostname()
 	if err != nil {
 		return err
@@ -96,6 +99,8 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 	}
 	a.server = server
 	a.upstreamDestAddr = server
+	a.tunnelConfig = tunnelConfig
+	a.tunnel = nil
 	a.group = group
 	a.host = host
 	a.architecture = runtime.GOARCH
@@ -129,6 +134,14 @@ func (a *Agent) Initialize(server string, group string, c2Config map[string]stri
 		return err
 	}
 	a.DiscoverPeers()
+
+	if len(tunnelConfig.Protocol) > 0 {
+		if err = a.StartTunnel(tunnelConfig); err != nil {
+			return err
+		}
+	} else {
+		output.VerbosePrint("[*] No tunnel protocol specified. Skipping tunnel setup.")
+	}
 
 	// Set up contacts
 	if err = a.SetCommunicationChannels(c2Config); err != nil {

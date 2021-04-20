@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/core"
 )
 
@@ -32,15 +33,20 @@ func main() {
 	httpProxyUrl :=  flag.String("httpProxyGateway", httpProxyGateway, "URL for the HTTP proxy gateway. For environments that use proxies to reach the internet.")
 	paw := flag.String("paw", paw, "Optionally specify a PAW on intialization")
 	group := flag.String("group", group, "Attach a group to this agent")
-	c2 := flag.String("c2", c2Name, "C2 Channel for agent")
+	c2Protocol := flag.String("c2", c2Name, "C2 Channel for agent")
 	delay := flag.Int("delay", 0, "Delay starting this agent by n-seconds")
 	verbose := flag.Bool("v", false, "Enable verbose output")
 	listenP2P := flag.Bool("listenP2P", parsedListenP2P, "Enable peer-to-peer receivers")
 	originLinkID := flag.Int("originLinkID", 0, "Optionally set originating link ID")
+	tunnelProtocol := flag.String("tunnelProtocol", "", "C2 comms tunnel type to use.")
+	tunnelAddr := flag.String("tunnelAddr", "", "Address used to connect to or start the tunnel.")
+	tunnelUsername := flag.String("tunnelUser", "", "Username used to authenticate to the tunnel.")
+	tunnelPassword := flag.String("tunnelPassword", "", "Password used to authenticate to the tunnel.")
 
 	flag.Parse()
 
-    trimmedServer := strings.TrimRight(*server, "/")
-	c2Config := map[string]string{"c2Name": *c2, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
-	core.Core(trimmedServer, *group, *delay, c2Config, *listenP2P, *verbose, *paw, *originLinkID)
+	trimmedServer := strings.TrimRight(*server, "/")
+	tunnelConfig := contact.BuildTunnelConfig(*tunnelProtocol, *tunnelAddr, trimmedServer, *tunnelUsername, *tunnelPassword)
+	contactConfig := map[string]string{"c2Name": *c2Protocol, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
+	core.Core(trimmedServer, tunnelConfig, *group, *delay, contactConfig, *listenP2P, *verbose, *paw, *originLinkID)
 }
