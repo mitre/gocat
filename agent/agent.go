@@ -237,6 +237,7 @@ func (a *Agent) HandleBeaconFailure() error {
 		// Reset counter and try switching proxy methods
 		a.failedBeaconCounter = 0
 		output.VerbosePrint("[!] Reached beacon failure threshold. Attempting to switch to new peer proxy method.")
+		a.usingTunnel = false
 		return a.findAvailablePeerProxyClient()
 	}
 	return nil
@@ -380,6 +381,9 @@ func (a *Agent) Display() {
 	if a.enableLocalP2pReceivers {
 		a.displayLocalReceiverInformation()
 	}
+	if a.usingTunnel {
+		output.VerbosePrint(fmt.Sprintf("Local tunnel endpoint=%s", a.upstreamDestAddr))
+	}
 }
 
 func (a *Agent) displayLocalReceiverInformation() {
@@ -499,7 +503,9 @@ func (a *Agent) modifyAgentConfiguration(config map[string]string) {
 
 func (a *Agent) updateUpstreamDestAddr(newDestAddr string) {
 	a.upstreamDestAddr = newDestAddr
-	a.beaconContact.SetUpstreamDestAddr(newDestAddr)
+	if a.beaconContact != nil {
+		a.beaconContact.SetUpstreamDestAddr(newDestAddr)
+	}
 }
 
 func (a *Agent) updateUpstreamComs(newComs contact.Contact) {

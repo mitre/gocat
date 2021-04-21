@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -46,7 +47,15 @@ func main() {
 	flag.Parse()
 
 	trimmedServer := strings.TrimRight(*server, "/")
-	tunnelConfig := contact.BuildTunnelConfig(*tunnelProtocol, *tunnelAddr, trimmedServer, *tunnelUsername, *tunnelPassword)
-	contactConfig := map[string]string{"c2Name": *c2Protocol, "c2Key": c2Key, "httpProxyGateway": *httpProxyUrl}
+	tunnelConfig, err := contact.BuildTunnelConfig(*tunnelProtocol, *tunnelAddr, trimmedServer, *tunnelUsername, *tunnelPassword)
+	if err != nil && *verbose {
+		fmt.Println(fmt.Sprintf("[!] Error building tunnel config: %s", err.Error()))
+		return
+	}
+	contactConfig := map[string]string{
+		"c2Name": *c2Protocol,
+		"c2Key": c2Key,
+		"httpProxyGateway": *httpProxyUrl,
+	}
 	core.Core(trimmedServer, tunnelConfig, *group, *delay, contactConfig, *listenP2P, *verbose, *paw, *originLinkID)
 }

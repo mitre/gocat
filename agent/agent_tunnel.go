@@ -10,23 +10,24 @@ import (
 
 func (a *Agent) StartTunnel(tunnelConfig *contact.TunnelConfig) error {
 	a.usingTunnel = false
-	tunnel, ok := contact.CommunicationTunnels[tunnelConfig.Protocol]
+	tunnelFactoryFunc, ok := contact.CommunicationTunnelFactories[tunnelConfig.Protocol]
 	if !ok {
-		return errors.New(fmt.Sprintf("Could not find communication tunnel for protocol %s", tunnelConfig.Protocol))
+		return errors.New(fmt.Sprintf("Could not find communication tunnel factory for protocol %s", tunnelConfig.Protocol))
 	}
-	a.tunnel = tunnel
-	if err := a.tunnel.Initialize(tunnelConfig); err != nil {
+	tunnel, err := tunnelFactoryFunc(tunnelConfig)
+	if err != nil {
 		return err
 	}
+	a.tunnel = tunnel
 	output.VerbosePrint(fmt.Sprintf("[*] Starting %s tunnel", tunnel.GetName()))
 	tunnelReady := make(chan bool)
-	go a.tunnel.Run(tunnelReady)
+	go a.tunnel.Start(tunnelReady)
 
 	// Wait for tunnel to be ready
 	ready := <-tunnelReady
 	if ready {
-		output.VerbosePrint(fmt.Sprintf("[*] %s tunnel ready and listening on %s.", a.tunnel.GetName(), a.tunnel.GetLocalAddr()))
-		a.updateUpstreamDestAddr(a.tunnel.GetLocalAddr())
+		output.VerbosePrint(fmt.Sprintf("[*] %s tunnel ready and listening on %s.", a.tunnel.GetName(), a.tunnel.GetLocalEndpoint()))
+		a.updateUpstreamDestAddr(a.tunnel.GetLocalEndpoint())
 		a.usingTunnel = true
 		return nil
 	}
