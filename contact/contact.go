@@ -8,12 +8,12 @@ const (
 //Contact defines required functions for communicating with the server
 type Contact interface {
 	GetBeaconBytes(profile map[string]interface{}) []byte
-	GetPayloadBytes(profile map[string]interface{}, payload string) ([]byte, string)
+	GetPayloadBytes(profile map[string]interface{}, payload string, link_id string) ([]byte, string)
 	C2RequirementsMet(profile map[string]interface{}, c2Config map[string]string) (bool, map[string]string)
 	SendExecutionResults(profile map[string]interface{}, result map[string]interface{})
 	GetName() string
 	SetUpstreamDestAddr(upstreamDestAddr string)
-	UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte) error
+	UploadFileBytes(profile map[string]interface{}, uploadName string, data []byte, link_id string) error
 }
 
 //CommunicationChannels contains the contact implementations

