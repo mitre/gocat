@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/mitre/gocat/contact"
+	"github.com/mitre/gocat/encoders"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
@@ -65,6 +66,7 @@ type Agent struct {
 	initialDelay float64
 	originLinkID int
 	hostIPAddrs []string
+	availableDataEncoders []string
 
 	// Communication methods
 	beaconContact contact.Contact
@@ -114,6 +116,7 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 	a.initialDelay = float64(initialDelay)
 	a.failedBeaconCounter = 0
 	a.originLinkID = originLinkID
+	a.availableDataEncoders = encoders.GetAvailableDataEncoders()
 
 	a.hostIPAddrs, err = proxy.GetLocalIPv4Addresses()
 	if err != nil {
@@ -384,6 +387,7 @@ func (a *Agent) Display() {
 	if a.usingTunnel {
 		output.VerbosePrint(fmt.Sprintf("Local tunnel endpoint=%s", a.upstreamDestAddr))
 	}
+	output.VerbosePrint(fmt.Sprintf("available data encoders=%s", strings.Join(a.availableDataEncoders, ", ")))
 }
 
 func (a *Agent) displayLocalReceiverInformation() {
