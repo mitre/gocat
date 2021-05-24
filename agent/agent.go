@@ -271,7 +271,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 	}
 
 	// Execute command
-	commandOutput, status, pid := execute.RunCommand(info)
+	commandOutput, status, pid, commandTimestamp := execute.RunCommand(info)
 
 	// Clean up payloads
 	a.removePayloadsOnDisk(onDiskPayloads)
@@ -282,6 +282,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 		result["output"] = commandOutput
 		result["status"] = status
 		result["pid"] = pid
+		result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
 		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}

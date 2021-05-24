@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"path/filepath"
 	"fmt"
+	"time"
 	"os"
 	"strings"
 )
@@ -13,13 +14,13 @@ const (
 	ERROR_STATUS 	= "1"
 	TIMEOUT_STATUS 	= "124"
 	SUCCESS_PID 	= "0"
-	ERROR_PID 	= "1"
+	ERROR_PID       = "1"
 )
 
 type Executor interface {
 	// Run takes a command string, timeout int, and instruction info.
 	// Returns Raw Output, A String status code, and a String PID
-	Run(command string, timeout int, info InstructionInfo) ([]byte, string, string)
+	Run(command string, timeout int, info InstructionInfo) ([]byte, string, string, time.Time)
 	String() string
 	CheckIfAvailable() bool
 
@@ -44,7 +45,7 @@ func AvailableExecutors() (values []string) {
 var Executors = map[string]Executor{}
 
 //RunCommand runs the actual command
-func RunCommand(info InstructionInfo) ([]byte, string, string) {
+func RunCommand(info InstructionInfo) ([]byte, string, string, time.Time) {
 	encodedCommand := info.Instruction["command"].(string)
 	executor := info.Instruction["executor"].(string)
 	timeout := int(info.Instruction["timeout"].(float64))
@@ -52,23 +53,26 @@ func RunCommand(info InstructionInfo) ([]byte, string, string) {
 	var status string
 	var result []byte
 	var pid string
+	var executionTimestamp time.Time
 	decoded, err := base64.StdEncoding.DecodeString(encodedCommand)
 	if err != nil {
 		result = []byte(fmt.Sprintf("Error when decoding command: %s", err.Error()))
 		status = ERROR_STATUS
 		pid = ERROR_STATUS
+		executionTimestamp = time.Now()
 	} else {
 		command := string(decoded)
 		missingPaths := checkPayloadsAvailable(onDiskPayloads)
 		if len(missingPaths) == 0 {
-			result, status, pid = Executors[executor].Run(command, timeout, info)
+			result, status, pid, executionTimestamp = Executors[executor].Run(command, timeout, info)
 		} else {
 			result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
 			status = ERROR_STATUS
 			pid = ERROR_STATUS
+			executionTimestamp = time.Now()
 		}
 	}
-	return result, status, pid
+	return result, status, pid, executionTimestamp
 }
 
 //checkPayloadsAvailable determines if any payloads are not on disk

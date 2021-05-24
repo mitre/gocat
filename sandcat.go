@@ -32,7 +32,7 @@ func main() {
 	}
 	server := flag.String("server", server, "The FQDN of the server")
 	httpProxyUrl :=  flag.String("httpProxyGateway", httpProxyGateway, "URL for the HTTP proxy gateway. For environments that use proxies to reach the internet.")
-	paw := flag.String("paw", paw, "Optionally specify a PAW on intialization")
+	paw := flag.String("paw", paw, "Optionally specify a PAW on initialization")
 	group := flag.String("group", group, "Attach a group to this agent")
 	c2Protocol := flag.String("c2", c2Name, "C2 Channel for agent")
 	delay := flag.Int("delay", 0, "Delay starting this agent by n-seconds")
