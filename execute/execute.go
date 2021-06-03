@@ -24,6 +24,7 @@ type Executor interface {
 	String() string
 	CheckIfAvailable() bool
 	UpdateBinary(newBinary string)
+	UpdateExecArgs(newArgs []string)
 
 	// Returns true if the executor wants the payload downloaded to memory, false if it wants the payload on disk.
 	DownloadPayloadToMemory(payloadName string) bool

@@ -44,3 +44,8 @@ func (p* Powershell) DownloadPayloadToMemory(payloadName string) bool {
 func (p *Powershell) UpdateBinary(newBinary string) {
 	p.path = newBinary
 }
+
+func (p *Powershell) UpdateExecArgs(newArgs []string) {
+	p.execArgs = make([]string, len(newArgs))
+	copy(p.execArgs, newArgs)
+}

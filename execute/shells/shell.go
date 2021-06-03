@@ -40,3 +40,8 @@ func (s* Sh) DownloadPayloadToMemory(payloadName string) bool {
 func (s* Sh) UpdateBinary(newBinary string) {
 	s.path = newBinary
 }
+
+func (s* Sh) UpdateExecArgs(newArgs []string) {
+	s.execArgs = make([]string, len(newArgs))
+	copy(s.execArgs, newArgs)
+}
