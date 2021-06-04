@@ -49,7 +49,6 @@ func (p *Proc) DownloadPayloadToMemory(payloadName string) bool {
 }
 
 func (p *Proc) getExeAndArgs(commandLine string) (string, []string, error) {
-	output.VerbosePrint(fmt.Sprintf("[*] Processing commandline %s", commandLine))
 	if runtime.GOOS == "windows" {
 		commandLine = strings.ReplaceAll(commandLine, "\\", "\\\\")
 	}
@@ -57,9 +56,5 @@ func (p *Proc) getExeAndArgs(commandLine string) (string, []string, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	execPath := split[0]
-	if strings.HasPrefix(execPath, ".") {
-		execPath = strings.Replace(execPath, ".", p.currDir, 1)
-	}
-	return execPath, split[1:], nil
+	return split[0], split[1:], nil
 }
