@@ -49,6 +49,14 @@ func (p *Proc) DownloadPayloadToMemory(payloadName string) bool {
 	return false
 }
 
+func (p *Proc) UpdateBinary(newBinary string) {
+	return
+}
+
+func (p *Proc) UpdateExecArgs(newArgs []string) {
+	return
+}
+
 func (p *Proc) getExeAndArgs(commandLine string) (string, []string, error) {
 	if runtime.GOOS == "windows" {
 		commandLine = strings.ReplaceAll(commandLine, "\\", "\\\\")

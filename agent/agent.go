@@ -44,6 +44,7 @@ type AgentInterface interface {
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
 	UploadFiles(instruction map[string]interface{})
+	ProcessExecutorChange(executorChange map[string]interface{}) error
 }
 
 // Implements AgentInterface
@@ -265,6 +266,43 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
  	a.UploadFiles(instruction)
+}
+
+func (a *Agent) ProcessExecutorChange(executorUpdateMap interface{}) error {
+	executorUpdate, ok := executorUpdateMap.(map[string]interface{})
+	if !ok {
+		return errors.New("Malformed executor update mapping.")
+	}
+	executorName := executorUpdate["executor"].(string)
+	action := executorUpdate["action"].(string)
+	value := executorUpdate["value"]
+	if len(executorName) > 0 && len(action) > 0 {
+		executor, ok := execute.Executors[executorName]
+		if !ok {
+			return errors.New(fmt.Sprintf("[Executor not found for %s", executorName))
+		}
+		switch action {
+		case "remove":
+			output.VerbosePrint(fmt.Sprintf("[*] Removing executor %s", executorName))
+			execute.RemoveExecutor(executorName)
+			return nil
+		case "update_path":
+			newPath, ok := value.(string)
+			if !ok {
+				return errors.New(fmt.Sprintf(
+					"[!] Error: expected string for new executor path, but received %T",
+					value,
+				))
+			}
+			output.VerbosePrint(fmt.Sprintf("[*] Updating executor %s with new path %s", executorName, newPath))
+			executor.UpdateBinary(newPath)
+			return nil
+		default:
+			return errors.New(fmt.Sprintf("[!] Error: executor update action %s not supported", action))
+		}
+	} else {
+		return errors.New("Missing executor name or action for executor update.")
+	}
 }
 
 func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[string]interface{} {
