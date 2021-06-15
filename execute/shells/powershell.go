@@ -5,6 +5,7 @@ package shells
 import (
 	"github.com/mitre/gocat/execute"
 	"os/exec"
+	"time"
 )
 
 type Powershell struct {
@@ -24,7 +25,7 @@ func init() {
 	}
 }
 
-func (p *Powershell) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string) {
+func (p *Powershell) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string, time.Time) {
 	return runShellExecutor(*exec.Command(p.path, append(p.execArgs, command)...), timeout)
 }
 

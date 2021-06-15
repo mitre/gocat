@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/user"
 	"os/exec"
+	"time"
 )
 
 // Checks for a file
@@ -45,4 +46,8 @@ func getUsername() (string, error) {
 	} else {
 		return userInfo.Username, nil
 	}
+}
+
+func getFormattedTimestamp(timestamp time.Time, dateFormat string) (string) {
+    return timestamp.Format(dateFormat)
 }

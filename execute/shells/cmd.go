@@ -5,6 +5,7 @@ package shells
 import (
 	"github.com/mitre/gocat/execute"
 	"os/exec"
+	"time"
 )
 
 type Cmd struct {
@@ -24,7 +25,7 @@ func init() {
 	}
 }
 
-func (c *Cmd) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string) {
+func (c *Cmd) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string, time.Time) {
 	return runShellExecutor(*exec.Command(c.path, append(c.execArgs, command)...), timeout)
 }
 

@@ -17,16 +17,17 @@ func checkExecutorInPath(path string) bool {
 	return err == nil
 }
 
-func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string) {
+func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string, time.Time) {
 	done := make(chan error, 1)
 	status := execute.SUCCESS_STATUS
 	var stdoutBuf, stderrBuf bytes.Buffer
 	cmd.SysProcAttr = getPlatformSysProcAttrs()
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
+	executionTimestamp := time.Now()
 	err := cmd.Start()
 	if err != nil {
-		return []byte(fmt.Sprintf("Encountered an error starting the process: %q", err.Error())), execute.ERROR_STATUS, execute.ERROR_PID
+		return []byte(fmt.Sprintf("Encountered an error starting the process: %q", err.Error())), execute.ERROR_STATUS, execute.ERROR_PID, executionTimestamp
 	}
 	pid := strconv.Itoa(cmd.Process.Pid)
 	go func() {
@@ -35,9 +36,9 @@ func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string) {
 	select {
 	case <-time.After(time.Duration(timeout) * time.Second):
 		if err := cmd.Process.Kill(); err != nil {
-			return []byte("Timeout reached, but couldn't kill the process"), execute.ERROR_STATUS, pid
+			return []byte("Timeout reached, but couldn't kill the process"), execute.ERROR_STATUS, pid, executionTimestamp
 		}
-		return []byte("Timeout reached, process killed"), execute.TIMEOUT_STATUS, pid
+		return []byte("Timeout reached, process killed"), execute.TIMEOUT_STATUS, pid, executionTimestamp
 	case err := <-done:
 		stdoutBytes := stdoutBuf.Bytes()
 		stderrBytes := stderrBuf.Bytes()
@@ -45,8 +46,8 @@ func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string) {
 			status = execute.ERROR_STATUS
 		}
 		if len(stderrBytes) > 0 {
-			return stderrBytes, status, pid
+			return stderrBytes, status, pid, executionTimestamp
 		}
-		return stdoutBytes, status, pid
+		return stdoutBytes, status, pid, executionTimestamp
 	}
 }
