@@ -5,6 +5,8 @@ package shells
 import (
 	"github.com/mitre/gocat/execute"
 	"os/exec"
+	"strings"
+	"syscall"
 	"time"
 )
 
@@ -26,7 +28,11 @@ func init() {
 }
 
 func (c *Cmd) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string, time.Time) {
-	return runShellExecutor(*exec.Command(c.path, append(c.execArgs, command)...), timeout)
+	cmd := *exec.Command(c.path)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	commandLineComponents := append(append([]string{c.path}, c.execArgs...), command)
+	cmd.SysProcAttr.CmdLine = strings.Join(commandLineComponents, " ")
+	return runShellExecutor(cmd, timeout)
 }
 
 func (c *Cmd) String() string {
