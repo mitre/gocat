@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 	"github.com/google/shlex"
 
 	"github.com/mitre/gocat/execute"
@@ -26,11 +27,11 @@ func init() {
 	execute.Executors[executor.name] = executor
 }
 
-func (p *Proc) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string) {
+func (p *Proc) Run(command string, timeout int, info execute.InstructionInfo) ([]byte, string, string, time.Time) {
 	exePath, exeArgs, err := p.getExeAndArgs(command)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[!] Error parsing command line: %s", err.Error()))
-		return nil, "", ""
+		return nil, "", "", time.Now()
 	}
 	output.VerbosePrint(fmt.Sprintf("[*] Starting process %s with args %v", exePath, exeArgs))
 	return runShellExecutor(*exec.Command(exePath, append(exeArgs)...), timeout)
