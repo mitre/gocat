@@ -21,7 +21,9 @@ func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string, time.T
 	done := make(chan error, 1)
 	status := execute.SUCCESS_STATUS
 	var stdoutBuf, stderrBuf bytes.Buffer
-	cmd.SysProcAttr = getPlatformSysProcAttrs()
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = getPlatformSysProcAttrs()
+	}
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
 	executionTimestamp := time.Now()
