@@ -259,7 +259,15 @@ func (a *Agent) Terminate() {
 // Runs a single instruction and send results if specified.
 // Will handle payload downloads according to executor.
 func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults bool) {
-	result := make(map[string]interface{})
+	result := a.runInstructionCommand(instruction)
+	if submitResults {
+		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
+		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+	}
+ 	a.UploadFiles(instruction)
+}
+
+func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[string]interface{} {
 	onDiskPayloads, inMemoryPayloads := a.DownloadPayloadsForInstruction(instruction)
 	info := execute.InstructionInfo{
 		Profile: a.GetTrimmedProfile(),
@@ -275,18 +283,13 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 	a.removePayloadsOnDisk(onDiskPayloads)
 
 	// Handle results
-	if submitResults {
-		result["id"] = instruction["id"]
-		result["output"] = commandOutput
-		result["status"] = status
-		result["pid"] = pid
-		result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
-		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
-		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
-	}
-
- 	// Perform any uploads after sending execution results
- 	a.UploadFiles(instruction)
+	result := make(map[string]interface{})
+	result["id"] = instruction["id"]
+	result["output"] = commandOutput
+	result["status"] = status
+	result["pid"] = pid
+	result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
+	return result
 }
 
 func (a *Agent) UploadFiles(instruction map[string]interface{}) {
