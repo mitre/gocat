@@ -59,7 +59,6 @@ type Agent struct {
 	location string
 	pid int
 	ppid int
-	executors []string
 	privilege string
 	exe_name string
 	paw string
@@ -110,7 +109,6 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 	a.location = os.Args[0]
 	a.pid = os.Getpid()
 	a.ppid = os.Getppid()
-	a.executors = execute.AvailableExecutors()
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
 	a.initialDelay = float64(initialDelay)
@@ -176,7 +174,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"location": a.location,
 		"pid": a.pid,
 		"ppid": a.ppid,
-		"executors": a.executors,
+		"executors": execute.AvailableExecutors(),
 		"privilege": a.privilege,
 		"exe_name": a.exe_name,
 		"proxy_receivers": a.localP2pReceiverAddresses,
