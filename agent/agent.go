@@ -412,12 +412,12 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 	payloads := instruction["payloads"].([]interface{})
 	executorName := instruction["executor"].(string)
 	executor, ok := execute.Executors[executorName]
-	if !ok {
-		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
-		return nil, nil
-	}
 	var onDiskPayloadNames []string
 	inMemoryPayloads := make(map[string][]byte)
+	if !ok {
+		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
+		return onDiskPayloadNames, inMemoryPayloads
+	}
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payloadName := availablePayloads.Index(i).Elem().String()
