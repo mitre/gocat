@@ -75,6 +75,10 @@ func RunCommand(info InstructionInfo) ([]byte, string, string, time.Time) {
 	return result, status, pid, executionTimestamp
 }
 
+func RemoveExecutor(name string) {
+	delete(Executors, name)
+}
+
 //checkPayloadsAvailable determines if any payloads are not on disk
 func checkPayloadsAvailable(payloads []string) []string {
 	var missing []string
