@@ -46,3 +46,7 @@ func (c *Cmd) CheckIfAvailable() bool {
 func (c* Cmd) DownloadPayloadToMemory(payloadName string) bool {
 	return false
 }
+
+func (c* Cmd) UpdateBinary(newBinary string) {
+	c.path = newBinary
+}

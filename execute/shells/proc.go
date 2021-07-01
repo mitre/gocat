@@ -59,3 +59,7 @@ func (p *Proc) getExeAndArgs(commandLine string) (string, []string, error) {
 	}
 	return split[0], split[1:], nil
 }
+
+func (p *Proc) UpdateBinary(newBinary string) {
+	return
+}
