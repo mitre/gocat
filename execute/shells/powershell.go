@@ -40,3 +40,7 @@ func (p *Powershell) CheckIfAvailable() bool {
 func (p* Powershell) DownloadPayloadToMemory(payloadName string) bool {
 	return false
 }
+
+func (p *Powershell) UpdateBinary(newBinary string) {
+	p.path = newBinary
+}
