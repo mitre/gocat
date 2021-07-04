@@ -64,7 +64,7 @@ type Agent struct {
 	exe_name string
 	paw string
 	initialDelay float64
-	originLinkID int
+	originLinkID string
 	hostIPAddrs []string
 	availableDataEncoders []string
 
@@ -89,7 +89,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID int) error {
+func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID string) error {
 	host, err := os.Hostname()
 	if err != nil {
 		return err
