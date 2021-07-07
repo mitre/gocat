@@ -44,6 +44,7 @@ type AgentInterface interface {
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
 	UploadFiles(instruction map[string]interface{})
+	ProcessExecutorChange(executorChange map[string]interface{}) error
 }
 
 // Implements AgentInterface
@@ -110,7 +111,6 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 	a.location = os.Args[0]
 	a.pid = os.Getpid()
 	a.ppid = os.Getppid()
-	a.executors = execute.AvailableExecutors()
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
 	a.initialDelay = float64(initialDelay)
@@ -261,7 +261,15 @@ func (a *Agent) Terminate() {
 // Runs a single instruction and send results if specified.
 // Will handle payload downloads according to executor.
 func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults bool) {
-	result := make(map[string]interface{})
+	result := a.runInstructionCommand(instruction)
+	if submitResults {
+		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
+		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+	}
+ 	a.UploadFiles(instruction)
+}
+
+func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[string]interface{} {
 	onDiskPayloads, inMemoryPayloads := a.DownloadPayloadsForInstruction(instruction)
 	info := execute.InstructionInfo{
 		Profile:          a.GetTrimmedProfile(),
@@ -414,12 +422,12 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 	payloads := instruction["payloads"].([]interface{})
 	executorName := instruction["executor"].(string)
 	executor, ok := execute.Executors[executorName]
-	if !ok {
-		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
-		return nil, nil
-	}
 	var onDiskPayloadNames []string
 	inMemoryPayloads := make(map[string][]byte)
+	if !ok {
+		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
+		return onDiskPayloadNames, inMemoryPayloads
+	}
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payloadName := availablePayloads.Index(i).Elem().String()
@@ -578,4 +586,41 @@ func (a *Agent) GetCurrentContactName() string {
 		return currContact.GetName()
 	}
 	return ""
+}
+
+func (a *Agent) ProcessExecutorChange(executorUpdateMap interface{}) error {
+	executorUpdate, ok := executorUpdateMap.(map[string]interface{})
+	if !ok {
+		return errors.New("Malformed executor update mapping.")
+	}
+	executorName := executorUpdate["executor"].(string)
+	action := executorUpdate["action"].(string)
+	value := executorUpdate["value"]
+	if len(executorName) > 0 && len(action) > 0 {
+		executor, ok := execute.Executors[executorName]
+		if !ok {
+			return errors.New(fmt.Sprintf("[Executor not found for %s", executorName))
+		}
+		switch action {
+		case "remove":
+			output.VerbosePrint(fmt.Sprintf("[*] Removing executor %s", executorName))
+			execute.RemoveExecutor(executorName)
+			return nil
+		case "update_path":
+			newPath, ok := value.(string)
+			if !ok {
+				return errors.New(fmt.Sprintf(
+					"[!] Error: expected string for new executor path, but received %T",
+					value,
+				))
+			}
+			output.VerbosePrint(fmt.Sprintf("[*] Updating executor %s with new path %s", executorName, newPath))
+			executor.UpdateBinary(newPath)
+			return nil
+		default:
+			return errors.New(fmt.Sprintf("[!] Error: executor update action %s not supported", action))
+		}
+	} else {
+		return errors.New("Missing executor name or action for executor update.")
+	}
 }
