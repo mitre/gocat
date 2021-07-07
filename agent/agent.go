@@ -60,7 +60,6 @@ type Agent struct {
 	location              string
 	pid                   int
 	ppid                  int
-	executors             []string
 	privilege             string
 	exe_name              string
 	paw                   string
@@ -176,7 +175,7 @@ func (a *Agent) GetFullProfile() map[string]interface{} {
 		"location":           a.location,
 		"pid":                a.pid,
 		"ppid":               a.ppid,
-		"executors":          a.executors,
+		"executors":          execute.AvailableExecutors(),
 		"privilege":          a.privilege,
 		"exe_name":           a.exe_name,
 		"proxy_receivers":    a.localP2pReceiverAddresses,
@@ -266,7 +265,7 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
 		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
 	}
- 	a.UploadFiles(instruction)
+	a.UploadFiles(instruction)
 }
 
 func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[string]interface{} {
@@ -285,18 +284,13 @@ func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[st
 	a.removePayloadsOnDisk(onDiskPayloads)
 
 	// Handle results
-	if submitResults {
-		result["id"] = instruction["id"]
-		result["output"] = commandOutput
-		result["status"] = status
-		result["pid"] = pid
-		result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
-		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
-		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
-	}
-
-	// Perform any uploads after sending execution results
-	a.UploadFiles(instruction)
+	result := make(map[string]interface{})
+	result["id"] = instruction["id"]
+	result["output"] = commandOutput
+	result["status"] = status
+	result["pid"] = pid
+	result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
+	return result
 }
 
 func (a *Agent) UploadFiles(instruction map[string]interface{}) {
