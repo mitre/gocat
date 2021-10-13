@@ -78,7 +78,7 @@ type Agent struct {
 	// peer-to-peer info
 	enableLocalP2pReceivers   bool
 	p2pReceiverWaitGroup      *sync.WaitGroup
-	localP2pReceivers        map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
+	localP2pReceivers         map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
 	localP2pReceiverAddresses map[string][]string          // maps P2P protocol to receiver addresses listening on this machine
 	availablePeerReceivers    map[string][]string          // maps P2P protocol to receiver addresses running on peer machines
 	exhaustedPeerReceivers    map[string][]string          // maps P2P protocol to receiver addresses that the agent has tried using.
