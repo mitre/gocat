@@ -23,6 +23,7 @@ type Executor interface {
 	Run(command string, timeout int, info InstructionInfo) ([]byte, string, string, time.Time)
 	String() string
 	CheckIfAvailable() bool
+	UpdateBinary(newBinary string)
 
 	// Returns true if the executor wants the payload downloaded to memory, false if it wants the payload on disk.
 	DownloadPayloadToMemory(payloadName string) bool
@@ -73,6 +74,10 @@ func RunCommand(info InstructionInfo) ([]byte, string, string, time.Time) {
 		}
 	}
 	return result, status, pid, executionTimestamp
+}
+
+func RemoveExecutor(name string) {
+	delete(Executors, name)
 }
 
 //checkPayloadsAvailable determines if any payloads are not on disk

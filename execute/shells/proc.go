@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 	"github.com/google/shlex"
@@ -34,6 +35,9 @@ func (p *Proc) Run(command string, timeout int, info execute.InstructionInfo) ([
 		return nil, "", "", time.Now()
 	}
 	output.VerbosePrint(fmt.Sprintf("[*] Starting process %s with args %v", exePath, exeArgs))
+	if exePath == "del" || exePath == "rm" {
+		return p.deleteFiles(exeArgs)
+	}
 	return runShellExecutor(*exec.Command(exePath, append(exeArgs)...), timeout)
 }
 
@@ -58,4 +62,28 @@ func (p *Proc) getExeAndArgs(commandLine string) (string, []string, error) {
 		return "", nil, err
 	}
 	return split[0], split[1:], nil
+}
+
+func (p *Proc) UpdateBinary(newBinary string) {
+	return
+}
+
+func (p *Proc) deleteFiles(files []string) ([]byte, string, string, time.Time) {
+	pid := strconv.Itoa(os.Getpid())
+	var outputMessages []string
+	var msg string
+	var err error
+	status := execute.SUCCESS_STATUS
+	executionTimestamp := time.Now()
+	for _, toDelete := range files {
+		err = os.Remove(toDelete)
+		if err != nil {
+			msg = fmt.Sprintf("Failed to remove %s: %s", toDelete, err.Error())
+			status = execute.ERROR_STATUS
+		} else {
+			msg = fmt.Sprintf("Removed file %s.", toDelete)
+		}
+		outputMessages = append(outputMessages, msg)
+	}
+	return []byte(strings.Join(outputMessages, "\n")), status, pid, executionTimestamp
 }

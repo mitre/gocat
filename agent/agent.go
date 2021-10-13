@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,18 +10,17 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
-	"context"
-	"strings"
 
+	"github.com/grandcat/zeroconf"
 	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/encoders"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
 	"github.com/mitre/gocat/proxy"
-	"github.com/grandcat/zeroconf"
 )
 
 var beaconFailureThreshold = 3
@@ -44,45 +44,45 @@ type AgentInterface interface {
 	AttemptSelectComChannel(requestedChannelConfig map[string]string, requestedChannel string) error
 	GetCurrentContactName() string
 	UploadFiles(instruction map[string]interface{})
+	ProcessExecutorChange(executorChange map[string]interface{}) error
 }
 
 // Implements AgentInterface
 type Agent struct {
 	// Profile fields
-	server string
-	tunnelConfig *contact.TunnelConfig
-	group string
-	host string
-	username string
-	architecture string
-	platform string
-	location string
-	pid int
-	ppid int
-	executors []string
-	privilege string
-	exe_name string
-	paw string
-	initialDelay float64
-	originLinkID string
-	hostIPAddrs []string
+	server                string
+	tunnelConfig          *contact.TunnelConfig
+	group                 string
+	host                  string
+	username              string
+	architecture          string
+	platform              string
+	location              string
+	pid                   int
+	ppid                  int
+	privilege             string
+	exe_name              string
+	paw                   string
+	initialDelay          float64
+	originLinkID          string
+	hostIPAddrs           []string
 	availableDataEncoders []string
 
 	// Communication methods
-	beaconContact contact.Contact
+	beaconContact       contact.Contact
 	failedBeaconCounter int
-	upstreamDestAddr string // address of server/peer that agent uses to contact C2
-	tunnel contact.Tunnel
-	usingTunnel bool
+	upstreamDestAddr    string // address of server/peer that agent uses to contact C2
+	tunnel              contact.Tunnel
+	usingTunnel         bool
 
 	// peer-to-peer info
-	enableLocalP2pReceivers bool
-	p2pReceiverWaitGroup *sync.WaitGroup
-	localP2pReceivers map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
-	localP2pReceiverAddresses map[string][]string // maps P2P protocol to receiver addresses listening on this machine
-	availablePeerReceivers map[string][]string // maps P2P protocol to receiver addresses running on peer machines
-	exhaustedPeerReceivers map[string][]string // maps P2P protocol to receiver addresses that the agent has tried using.
-	usingPeerReceivers bool // True if connecting to C2 via proxy peer
+	enableLocalP2pReceivers   bool
+	p2pReceiverWaitGroup      *sync.WaitGroup
+	localP2pReceivers        map[string]proxy.P2pReceiver // maps P2P protocol to receiver running on this machine
+	localP2pReceiverAddresses map[string][]string          // maps P2P protocol to receiver addresses listening on this machine
+	availablePeerReceivers    map[string][]string          // maps P2P protocol to receiver addresses running on peer machines
+	exhaustedPeerReceivers    map[string][]string          // maps P2P protocol to receiver addresses that the agent has tried using.
+	usingPeerReceivers        bool                         // True if connecting to C2 via proxy peer
 
 	// Deadman instructions to run before termination. Will be list of instruction mappings.
 	deadmanInstructions []map[string]interface{}
@@ -110,7 +110,6 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 	a.location = os.Args[0]
 	a.pid = os.Getpid()
 	a.ppid = os.Getppid()
-	a.executors = execute.AvailableExecutors()
 	a.privilege = privdetect.Privlevel()
 	a.exe_name = filepath.Base(os.Args[0])
 	a.initialDelay = float64(initialDelay)
@@ -120,7 +119,7 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 
 	a.hostIPAddrs, err = proxy.GetLocalIPv4Addresses()
 	if err != nil {
-	    return err
+		return err
 	}
 
 	// Paw will get initialized after successful beacon if it's not specified via command line
@@ -165,37 +164,37 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 // Returns full profile for agent.
 func (a *Agent) GetFullProfile() map[string]interface{} {
 	return map[string]interface{}{
-		"paw": a.paw,
-		"server": a.server,
-		"group": a.group,
-		"host": a.host,
-		"contact": a.GetCurrentContactName(),
-		"username": a.username,
-		"architecture": a.architecture,
-		"platform": a.platform,
-		"location": a.location,
-		"pid": a.pid,
-		"ppid": a.ppid,
-		"executors": a.executors,
-		"privilege": a.privilege,
-		"exe_name": a.exe_name,
-		"proxy_receivers": a.localP2pReceiverAddresses,
-		"origin_link_id": a.originLinkID,
-		"deadman_enabled": true,
+		"paw":                a.paw,
+		"server":             a.server,
+		"group":              a.group,
+		"host":               a.host,
+		"contact":            a.GetCurrentContactName(),
+		"username":           a.username,
+		"architecture":       a.architecture,
+		"platform":           a.platform,
+		"location":           a.location,
+		"pid":                a.pid,
+		"ppid":               a.ppid,
+		"executors":          execute.AvailableExecutors(),
+		"privilege":          a.privilege,
+		"exe_name":           a.exe_name,
+		"proxy_receivers":    a.localP2pReceiverAddresses,
+		"origin_link_id":     a.originLinkID,
+		"deadman_enabled":    true,
 		"available_contacts": contact.GetAvailableCommChannels(),
-		"host_ip_addrs": a.hostIPAddrs,
-		"upstream_dest": a.upstreamDestAddr,
+		"host_ip_addrs":      a.hostIPAddrs,
+		"upstream_dest":      a.upstreamDestAddr,
 	}
 }
 
 // Return minimal subset of agent profile.
 func (a *Agent) GetTrimmedProfile() map[string]interface{} {
 	return map[string]interface{}{
-		"paw": a.paw,
-		"server": a.server,
-		"platform": a.platform,
-		"host": a.host,
-		"contact": a.GetCurrentContactName(),
+		"paw":           a.paw,
+		"server":        a.server,
+		"platform":      a.platform,
+		"host":          a.host,
+		"contact":       a.GetCurrentContactName(),
 		"upstream_dest": a.upstreamDestAddr,
 	}
 }
@@ -261,12 +260,20 @@ func (a *Agent) Terminate() {
 // Runs a single instruction and send results if specified.
 // Will handle payload downloads according to executor.
 func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults bool) {
-	result := make(map[string]interface{})
+	result := a.runInstructionCommand(instruction)
+	if submitResults {
+		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
+		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
+	}
+	a.UploadFiles(instruction)
+}
+
+func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[string]interface{} {
 	onDiskPayloads, inMemoryPayloads := a.DownloadPayloadsForInstruction(instruction)
 	info := execute.InstructionInfo{
-		Profile: a.GetTrimmedProfile(),
-		Instruction: instruction,
-		OnDiskPayloads: onDiskPayloads,
+		Profile:          a.GetTrimmedProfile(),
+		Instruction:      instruction,
+		OnDiskPayloads:   onDiskPayloads,
 		InMemoryPayloads: inMemoryPayloads,
 	}
 
@@ -277,18 +284,13 @@ func (a *Agent) RunInstruction(instruction map[string]interface{}, submitResults
 	a.removePayloadsOnDisk(onDiskPayloads)
 
 	// Handle results
-	if submitResults {
-		result["id"] = instruction["id"]
-		result["output"] = commandOutput
-		result["status"] = status
-		result["pid"] = pid
-		result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
-		output.VerbosePrint(fmt.Sprintf("[*] Submitting results for link %s via C2 channel %s", result["id"].(string), a.GetCurrentContactName()))
-		a.beaconContact.SendExecutionResults(a.GetTrimmedProfile(), result)
-	}
-
- 	// Perform any uploads after sending execution results
- 	a.UploadFiles(instruction)
+	result := make(map[string]interface{})
+	result["id"] = instruction["id"]
+	result["output"] = commandOutput
+	result["status"] = status
+	result["pid"] = pid
+	result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
+	return result
 }
 
 func (a *Agent) UploadFiles(instruction map[string]interface{}) {
@@ -414,12 +416,12 @@ func (a *Agent) DownloadPayloadsForInstruction(instruction map[string]interface{
 	payloads := instruction["payloads"].([]interface{})
 	executorName := instruction["executor"].(string)
 	executor, ok := execute.Executors[executorName]
-	if !ok {
-		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
-		return nil, nil
-	}
 	var onDiskPayloadNames []string
 	inMemoryPayloads := make(map[string][]byte)
+	if !ok {
+		output.VerbosePrint(fmt.Sprintf("[!] No executor found for executor name %s. Not downloading payloads.", executorName))
+		return onDiskPayloadNames, inMemoryPayloads
+	}
 	availablePayloads := reflect.ValueOf(payloads)
 	for i := 0; i < availablePayloads.Len(); i++ {
 		payloadName := availablePayloads.Index(i).Elem().String()
@@ -517,53 +519,60 @@ func (a *Agent) updateUpstreamComs(newComs contact.Contact) {
 	a.beaconContact = newComs
 }
 
-func (a *Agent) evaluateNewPeers(results <- chan *zeroconf.ServiceEntry) {
-    for entry := range results {
-        for _, ip := range entry.AddrIPv4 {
-            a.mergeNewPeers(entry.Text[0], fmt.Sprintf("%s:%d", ip, entry.Port))
-        }
-    }
+func (a *Agent) evaluateNewPeers(results <-chan *zeroconf.ServiceEntry) {
+	for entry := range results {
+		for _, ip := range entry.AddrIPv4 {
+			a.mergeNewPeers(entry.Text[0], fmt.Sprintf("%s:%d", ip, entry.Port))
+		}
+	}
 }
 
 func (a *Agent) mergeNewPeers(proxyChannel string, ipPort string) {
-    peer := fmt.Sprintf("%s://%s", strings.ToLower(proxyChannel), ipPort)
-    allPeers := append(a.availablePeerReceivers[proxyChannel], a.exhaustedPeerReceivers[proxyChannel]...)
-    for _, existingPeer := range allPeers {
-        if peer == existingPeer {
-            return
-        }
-    }
-    for protocol, addressList := range a.localP2pReceiverAddresses {
-        if proxyChannel == protocol {
-            for _, address := range addressList {
-                if peer == address {
-                    return
-                }
-            }
+	peer := fmt.Sprintf("%s://%s", strings.ToLower(proxyChannel), ipPort)
+	allPeers := append(a.availablePeerReceivers[proxyChannel], a.exhaustedPeerReceivers[proxyChannel]...)
+	for _, existingPeer := range allPeers {
+		if peer == existingPeer {
+			return
 		}
 	}
-    a.availablePeerReceivers[proxyChannel] = append(a.availablePeerReceivers[proxyChannel], peer)
-    output.VerbosePrint(fmt.Sprintf("[*] new peer added: %s", peer))
+	for protocol, addressList := range a.localP2pReceiverAddresses {
+		if proxyChannel == protocol {
+			for _, address := range addressList {
+				if peer == address {
+					return
+				}
+			}
+		}
+	}
+	a.availablePeerReceivers[proxyChannel] = append(a.availablePeerReceivers[proxyChannel], peer)
+	output.VerbosePrint(fmt.Sprintf("[*] new peer added: %s", peer))
 }
 
 func (a *Agent) DiscoverPeers() {
-    // Discover all services on the network (e.g. _workstation._tcp)
-    resolver, err := zeroconf.NewResolver(nil)
-    if err != nil {
-        output.VerbosePrint(fmt.Sprintf("[-] Failed to initialize zeroconf resolver: %s", err.Error()))
-    }
+	// Recover on any panic on the external module call and not take down the whole agent.
+	defer func() {
+		if err := recover(); err != nil {
+			output.VerbosePrint(fmt.Sprintf("[-] Panic occurred when calling zeroconf:", err))
+		}
+	}()
 
-    entries := make(chan *zeroconf.ServiceEntry)
-    go a.evaluateNewPeers(entries)
+	// Discover all services on the network (e.g. _workstation._tcp)
+	resolver, err := zeroconf.NewResolver(nil)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Failed to initialize zeroconf resolver: %s", err.Error()))
+	}
 
-    ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
-    defer cancel()
-    err = resolver.Browse(ctx, "_service._comms", "local.", entries)
-    if err != nil {
-         output.VerbosePrint(fmt.Sprintf("[-] Failed to browse for peers: %s", err.Error()))
-    }
+	entries := make(chan *zeroconf.ServiceEntry)
+	go a.evaluateNewPeers(entries)
 
-    <-ctx.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*1)
+	defer cancel()
+	err = resolver.Browse(ctx, "_service._comms", "local.", entries)
+	if err != nil {
+		output.VerbosePrint(fmt.Sprintf("[-] Failed to browse for peers: %s", err.Error()))
+	}
+
+	<-ctx.Done()
 }
 
 func (a *Agent) GetCurrentContactName() string {
@@ -571,4 +580,41 @@ func (a *Agent) GetCurrentContactName() string {
 		return currContact.GetName()
 	}
 	return ""
+}
+
+func (a *Agent) ProcessExecutorChange(executorUpdateMap interface{}) error {
+	executorUpdate, ok := executorUpdateMap.(map[string]interface{})
+	if !ok {
+		return errors.New("Malformed executor update mapping.")
+	}
+	executorName := executorUpdate["executor"].(string)
+	action := executorUpdate["action"].(string)
+	value := executorUpdate["value"]
+	if len(executorName) > 0 && len(action) > 0 {
+		executor, ok := execute.Executors[executorName]
+		if !ok {
+			return errors.New(fmt.Sprintf("[Executor not found for %s", executorName))
+		}
+		switch action {
+		case "remove":
+			output.VerbosePrint(fmt.Sprintf("[*] Removing executor %s", executorName))
+			execute.RemoveExecutor(executorName)
+			return nil
+		case "update_path":
+			newPath, ok := value.(string)
+			if !ok {
+				return errors.New(fmt.Sprintf(
+					"[!] Error: expected string for new executor path, but received %T",
+					value,
+				))
+			}
+			output.VerbosePrint(fmt.Sprintf("[*] Updating executor %s with new path %s", executorName, newPath))
+			executor.UpdateBinary(newPath)
+			return nil
+		default:
+			return errors.New(fmt.Sprintf("[!] Error: executor update action %s not supported", action))
+		}
+	} else {
+		return errors.New("Missing executor name or action for executor update.")
+	}
 }

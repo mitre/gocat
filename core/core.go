@@ -73,6 +73,13 @@ func runAgent(sandcatAgent *agent.Agent, c2Config map[string]string) {
 			}
 		}
 
+		// Check if we need to update executors
+		if beacon["executor_change"] != nil {
+			if err := sandcatAgent.ProcessExecutorChange(beacon["executor_change"]); err != nil {
+				output.VerbosePrint(fmt.Sprintf("[!] Error updating executor: %s", err.Error()))
+			}
+		}
+
 		// Handle instructions
 		if beacon["instructions"] != nil && len(beacon["instructions"].([]interface{})) > 0 {
 			// Run commands and send results.
