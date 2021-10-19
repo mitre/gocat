@@ -107,7 +107,10 @@ func (a *Agent) Initialize(server string, tunnelConfig *contact.TunnelConfig, gr
 	a.host = host
 	a.architecture = runtime.GOARCH
 	a.platform = runtime.GOOS
-	a.location = os.Args[0]
+	a.location, err = os.Executable()
+	if err != nil {
+		return err
+	}
 	a.pid = os.Getpid()
 	a.ppid = os.Getppid()
 	a.privilege = privdetect.Privlevel()
