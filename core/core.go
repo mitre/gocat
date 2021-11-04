@@ -3,27 +3,27 @@ package core
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"reflect"
 	"time"
-	"math/rand"
 
 	"github.com/mitre/gocat/agent"
 	"github.com/mitre/gocat/output"
 
-	_ "github.com/mitre/gocat/execute/donut" // necessary to initialize all submodules
-	_ "github.com/mitre/gocat/execute/shells" // necessary to initialize all submodules
+	_ "github.com/mitre/gocat/execute/donut"     // necessary to initialize all submodules
 	_ "github.com/mitre/gocat/execute/shellcode" // necessary to initialize all submodules
+	_ "github.com/mitre/gocat/execute/shells"    // necessary to initialize all submodules
 )
 
 // Initializes and returns sandcat agent.
-func initializeCore(server string, group string, c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool, paw string, originLinkID int) (*agent.Agent, error) {
+func initializeCore(server string, group string, c2 map[string]string, p2pReceiversOn bool, initialDelay int, verbose bool, paw string, originLinkID string) (*agent.Agent, error) {
 	output.SetVerbose(verbose)
 	output.VerbosePrint("Starting sandcat in verbose mode.")
 	return agent.AgentFactory(server, group, c2, p2pReceiversOn, initialDelay, paw, originLinkID)
 }
 
 //Core is the main function as wrapped by sandcat.go
-func Core(server string, group string, delay int, c2 map[string]string, p2pReceiversOn bool, verbose bool, paw string, originLinkID int) {
+func Core(server string, group string, delay int, c2 map[string]string, p2pReceiversOn bool, verbose bool, paw string, originLinkID string) {
 	sandcatAgent, err := initializeCore(server, group, c2, p2pReceiversOn, delay, verbose, paw, originLinkID)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[-] Error when initializing agent: %s", err.Error()))

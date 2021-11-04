@@ -36,7 +36,7 @@ func main() {
 	delay := flag.Int("delay", 0, "Delay starting this agent by n-seconds")
 	verbose := flag.Bool("v", false, "Enable verbose output")
 	listenP2P := flag.Bool("listenP2P", parsedListenP2P, "Enable peer-to-peer receivers")
-	originLinkID := flag.Int("originLinkID", 0, "Optionally set originating link ID")
+	originLinkID := flag.String("originLinkID", "", "Optionally set originating link ID")
 
 	flag.Parse()
 

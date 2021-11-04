@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,17 +10,16 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
-	"context"
-	"strings"
 
+	"github.com/grandcat/zeroconf"
 	"github.com/mitre/gocat/contact"
 	"github.com/mitre/gocat/execute"
 	"github.com/mitre/gocat/output"
 	"github.com/mitre/gocat/privdetect"
 	"github.com/mitre/gocat/proxy"
-	"github.com/grandcat/zeroconf"
 )
 
 var beaconFailureThreshold = 3
@@ -62,7 +62,7 @@ type Agent struct {
 	exe_name string
 	paw string
 	initialDelay float64
-	originLinkID int
+	originLinkID string
 
 	// Communication methods
 	beaconContact contact.Contact
@@ -82,7 +82,7 @@ type Agent struct {
 }
 
 // Set up agent variables.
-func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID int) error {
+func (a *Agent) Initialize(server string, group string, c2Config map[string]string, enableLocalP2pReceivers bool, initialDelay int, paw string, originLinkID string) error {
 	host, err := os.Hostname()
 	if err != nil {
 		return err
