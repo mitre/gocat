@@ -26,7 +26,7 @@ func runShellExecutor(cmd exec.Cmd, timeout int) ([]byte, string, string, time.T
 	}
 	cmd.Stdout = &stdoutBuf
 	cmd.Stderr = &stderrBuf
-	executionTimestamp := time.Now().UTC()
+	executionTimestamp := time.Now()
 	err := cmd.Start()
 	if err != nil {
 		return []byte(fmt.Sprintf("Encountered an error starting the process: %q", err.Error())), execute.ERROR_STATUS, execute.ERROR_PID, executionTimestamp

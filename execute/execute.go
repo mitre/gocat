@@ -60,7 +60,7 @@ func RunCommand(info InstructionInfo) ([]byte, string, string, time.Time) {
 		result = []byte(fmt.Sprintf("Error when decoding command: %s", err.Error()))
 		status = ERROR_STATUS
 		pid = ERROR_STATUS
-		executionTimestamp = time.Now().UTC()
+		executionTimestamp = time.Now()
 	} else {
 		command := string(decoded)
 		missingPaths := checkPayloadsAvailable(onDiskPayloads)
@@ -70,7 +70,7 @@ func RunCommand(info InstructionInfo) ([]byte, string, string, time.Time) {
 			result = []byte(fmt.Sprintf("Payload(s) not available: %s", strings.Join(missingPaths, ", ")))
 			status = ERROR_STATUS
 			pid = ERROR_STATUS
-			executionTimestamp = time.Now().UTC()
+			executionTimestamp = time.Now()
 		}
 	}
 	return result, status, pid, executionTimestamp
