@@ -32,7 +32,7 @@ func (p *Proc) Run(command string, timeout int, info execute.InstructionInfo) ([
 	exePath, exeArgs, err := p.getExeAndArgs(command)
 	if err != nil {
 		output.VerbosePrint(fmt.Sprintf("[!] Error parsing command line: %s", err.Error()))
-		return nil, "", "", time.Now().UTC()
+		return nil, "", "", time.Now()
 	}
 	output.VerbosePrint(fmt.Sprintf("[*] Starting process %s with args %v", exePath, exeArgs))
 	if exePath == "del" || exePath == "rm" {
@@ -74,7 +74,7 @@ func (p *Proc) deleteFiles(files []string) ([]byte, string, string, time.Time) {
 	var msg string
 	var err error
 	status := execute.SUCCESS_STATUS
-	executionTimestamp := time.Now().UTC()
+	executionTimestamp := time.Now()
 	for _, toDelete := range files {
 		err = os.Remove(toDelete)
 		if err != nil {
