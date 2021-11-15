@@ -289,7 +289,7 @@ func (a *Agent) runInstructionCommand(instruction map[string]interface{}) map[st
 	result["output"] = commandOutput
 	result["status"] = status
 	result["pid"] = pid
-	result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02 03:04:05")
+	result["agent_reported_time"] = getFormattedTimestamp(commandTimestamp, "2006-01-02T15:04:05Z")
 	return result
 }
 
